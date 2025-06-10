@@ -1,415 +1,784 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Шифр Хилла с S-Box</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Hill Cipher</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .container { display: flex; flex-direction: column; gap: 20px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        textarea, input, select { padding: 8px; font-size: 16px; }
-        button { padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-        .results { display: flex; gap: 20px; }
-        .result-box { flex: 1; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
-        .plots { display: flex; gap: 20px; margin-top: 20px; }
-        .plot { flex: 1; }
-        img { max-width: 100%; }
-        .error { color: red; }
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --light-color: #ecf0f1;
+            --dark-color: #2c3e50;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark-color);
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1, h2, h3 {
+            color: var(--primary-color);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--secondary-color);
+            padding-bottom: 10px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: var(--light-color);
+            border-radius: 6px;
+        }
+        
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 20px auto;
+        }
+        
+        .matrix-cell {
+            width: 100%;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        textarea, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+        
+        .result-area {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-family: monospace;
+            white-space: pre-wrap;
+            min-height: 50px;
+        }
+        
+        .key-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .round-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .alert {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+        }
+        
+        .tab.active {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .info-icon {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            background-color: var(--secondary-color);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 18px;
+            font-size: 12px;
+            cursor: help;
+            margin-left: 5px;
+        }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/numpy@1.0.0/dist/numpy.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.7.0/math.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>Шифр Хилла с S-Box и многораундовостью</h1>
+        <h1>Advanced Hill Cipher</h1>
         
-        <form id="cipherForm">
-            <div class="form-group">
-                <label for="text">Текст:</label>
-                <textarea id="text" name="text" rows="4" required></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="key">Ключевое слово:</label>
-                <input type="text" id="key" name="key" value="HILL" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="rounds">Количество раундов:</label>
-                <select id="rounds" name="rounds">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3" selected>3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="block_size">Размер блока:</label>
-                <select id="block_size" name="block_size">
-                    <option value="2">2x2</option>
-                    <option value="3" selected>3x3</option>
-                </select>
-            </div>
-            
-            <button type="button" onclick="process('encrypt')">Зашифровать</button>
-            <button type="button" onclick="process('decrypt')">Дешифровать</button>
-        </form>
+        <div class="alert" id="alertBox"></div>
         
-        <div id="error" class="error"></div>
+        <div class="tabs">
+            <button class="tab active" onclick="openTab(event, 'encryptTab')">Encrypt</button>
+            <button class="tab" onclick="openTab(event, 'decryptTab')">Decrypt</button>
+            <button class="tab" onclick="openTab(event, 'theoryTab')">Theory</button>
+        </div>
         
-        <div id="results" class="results" style="display: none;">
-            <div class="result-box">
-                <h3>Результат:</h3>
-                <p id="resultText"></p>
+        <!-- Encryption Tab -->
+        <div id="encryptTab" class="tab-content active">
+            <div class="section">
+                <h2>Plaintext</h2>
+                <textarea id="plaintext" rows="4" placeholder="Enter plaintext to encrypt (letters only)"></textarea>
+                
+                <div class="key-controls">
+                    <div>
+                        <label for="keyWord">Key Word:</label>
+                        <input type="text" id="keyWord" placeholder="Enter key word (letters only)">
+                    </div>
+                    <div class="round-controls">
+                        <label for="rounds">Rounds:</label>
+                        <input type="number" id="rounds" min="1" max="10" value="3" style="width: 60px;">
+                    </div>
+                </div>
+                
+                <h3>Key Matrix (3x3)</h3>
+                <div class="matrix-grid" id="keyMatrix">
+                    <input type="number" class="matrix-cell" value="6">
+                    <input type="number" class="matrix-cell" value="24">
+                    <input type="number" class="matrix-cell" value="1">
+                    <input type="number" class="matrix-cell" value="13">
+                    <input type="number" class="matrix-cell" value="16">
+                    <input type="number" class="matrix-cell" value="10">
+                    <input type="number" class="matrix-cell" value="20">
+                    <input type="number" class="matrix-cell" value="17">
+                    <input type="number" class="matrix-cell" value="15">
+                </div>
+                
+                <button onclick="generateKeyMatrix()">Generate Matrix from Key Word</button>
+                <button onclick="validateMatrix()">Validate Matrix</button>
+                <button onclick="encrypt()" style="background-color: var(--accent-color);">Encrypt</button>
+            </div>
+            
+            <div class="section">
+                <h2>Ciphertext (Numerical)</h2>
+                <div class="result-area" id="ciphertextResult"></div>
+                
+                <h3>Encryption Process</h3>
+                <div class="result-area" id="encryptionProcess"></div>
             </div>
         </div>
         
-        <div class="plots">
-            <div class="plot" id="originalPlot"></div>
-            <div class="plot" id="resultPlot"></div>
+        <!-- Decryption Tab -->
+        <div id="decryptTab" class="tab-content">
+            <div class="section">
+                <h2>Ciphertext (Numerical)</h2>
+                <textarea id="ciphertextNumbers" rows="4" placeholder="Enter ciphertext numbers separated by spaces"></textarea>
+                
+                <div class="key-controls">
+                    <div>
+                        <label for="decryptKeyWord">Key Word:</label>
+                        <input type="text" id="decryptKeyWord" placeholder="Enter key word (letters only)">
+                    </div>
+                    <div class="round-controls">
+                        <label for="decryptRounds">Rounds:</label>
+                        <input type="number" id="decryptRounds" min="1" max="10" value="3" style="width: 60px;">
+                    </div>
+                </div>
+                
+                <h3>Key Matrix (3x3)</h3>
+                <div class="matrix-grid" id="decryptKeyMatrix">
+                    <input type="number" class="matrix-cell" value="6">
+                    <input type="number" class="matrix-cell" value="24">
+                    <input type="number" class="matrix-cell" value="1">
+                    <input type="number" class="matrix-cell" value="13">
+                    <input type="number" class="matrix-cell" value="16">
+                    <input type="number" class="matrix-cell" value="10">
+                    <input type="number" class="matrix-cell" value="20">
+                    <input type="number" class="matrix-cell" value="17">
+                    <input type="number" class="matrix-cell" value="15">
+                </div>
+                
+                <button onclick="generateDecryptKeyMatrix()">Generate Matrix from Key Word</button>
+                <button onclick="validateDecryptMatrix()">Validate Matrix</button>
+                <button onclick="decrypt()" style="background-color: var(--accent-color);">Decrypt</button>
+            </div>
+            
+            <div class="section">
+                <h2>Decrypted Plaintext</h2>
+                <div class="result-area" id="decryptedText"></div>
+                
+                <h3>Decryption Process</h3>
+                <div class="result-area" id="decryptionProcess"></div>
+            </div>
+        </div>
+        
+        <!-- Theory Tab -->
+        <div id="theoryTab" class="tab-content">
+            <div class="section">
+                <h2>Hill Cipher Theory</h2>
+                <p>The Hill cipher is a polygraphic substitution cipher based on linear algebra. Each letter is represented by a number (A=0, B=1, ..., Z=25).</p>
+                
+                <h3>Encryption Process</h3>
+                <p>The encryption is performed by breaking the plaintext into vectors of length 3 (for a 3x3 matrix) and multiplying each vector by the key matrix modulo 26:</p>
+                <p><strong>C = (K × P) mod 26</strong></p>
+                <p>Where:</p>
+                <ul>
+                    <li>C is the ciphertext vector</li>
+                    <li>K is the key matrix</li>
+                    <li>P is the plaintext vector</li>
+                </ul>
+                
+                <h3>Decryption Process</h3>
+                <p>Decryption requires finding the inverse of the key matrix modulo 26:</p>
+                <p><strong>P = (K⁻¹ × C) mod 26</strong></p>
+                <p>The inverse matrix exists only if the determinant of K is coprime with 26 (gcd(det(K), 26) = 1).</p>
+                
+                <h3>Enhancements in This Implementation</h3>
+                <ul>
+                    <li><strong>Multiple Rounds:</strong> The encryption/decryption process is repeated multiple times with different key matrices derived from the original.</li>
+                    <li><strong>S-Box:</strong> A substitution box adds nonlinearity by substituting numbers based on a key-dependent permutation.</li>
+                    <li><strong>Key Expansion:</strong> The initial key word is expanded to create round-specific key matrices.</li>
+                    <li><strong>Numerical Output:</strong> Ciphertext is displayed as numbers for clarity and to avoid character encoding issues.</li>
+                </ul>
+            </div>
         </div>
     </div>
 
     <script>
-        // Алфавит и S-Box
-        const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        const ALPHABET_SIZE = ALPHABET.length;
-        
-        const S_BOX = {
-            0: 5, 1: 14, 2: 7, 3: 2, 4: 11, 5: 8, 6: 13, 7: 4,
-            8: 10, 9: 15, 10: 3, 11: 0, 12: 9, 13: 6, 14: 12, 15: 1,
-            16: 18, 17: 25, 18: 20, 19: 17, 20: 22, 21: 19, 22: 24, 23: 16,
-            24: 21, 25: 23
-        };
-        
-        const INVERSE_S_BOX = {};
-        for (const key in S_BOX) {
-            INVERSE_S_BOX[S_BOX[key]] = parseInt(key);
-        }
-        
-        // Преобразование текста в числовую матрицу
-        function textToMatrix(text, blockSize) {
-            text = text.toUpperCase().replace(/ /g, '');
-            // Дополнение текста, если необходимо
-            const padding = (blockSize - text.length % blockSize) % blockSize;
-            text += 'X'.repeat(padding);
+        // S-box generation - key dependent substitution
+        function generateSBox(key) {
+            // Create initial S-box (0-255)
+            let sbox = Array.from({length: 26}, (_, i) => i);
             
-            const nums = [];
-            for (const c of text) {
-                nums.push(ALPHABET.indexOf(c));
+            // Use key to shuffle the S-box
+            let keySum = 0;
+            for (let i = 0; i < key.length; i++) {
+                keySum += key.charCodeAt(i);
             }
             
-            // Преобразование в матрицу
-            const matrix = [];
-            const numBlocks = nums.length / blockSize;
+            let j = keySum % 26;
+            for (let i = 0; i < 26; i++) {
+                j = (j + sbox[i] + key.charCodeAt(i % key.length)) % 26;
+                // Swap elements
+                [sbox[i], sbox[j]] = [sbox[j], sbox[i]];
+            }
             
-            for (let i = 0; i < blockSize; i++) {
-                const row = [];
-                for (let j = 0; j < numBlocks; j++) {
-                    row.push(nums[j * blockSize + i]);
+            return sbox;
+        }
+        
+        // Inverse S-box
+        function generateInverseSBox(sbox) {
+            let inverse = new Array(26);
+            for (let i = 0; i < 26; i++) {
+                inverse[sbox[i]] = i;
+            }
+            return inverse;
+        }
+        
+        // Modular matrix operations
+        function modMatInv(matrix, mod) {
+            // Calculate determinant
+            let det = matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) -
+                      matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]) +
+                      matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]);
+            
+            det = ((det % mod) + mod) % mod; // Ensure positive
+            
+            // Check if matrix is invertible
+            if (gcd(det, mod) !== 1) {
+                return null; // Matrix is not invertible
+            }
+            
+            // Calculate adjugate matrix
+            let adj = [
+                [
+                    (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]),
+                    -(matrix[0][1] * matrix[2][2] - matrix[0][2] * matrix[2][1]),
+                    (matrix[0][1] * matrix[1][2] - matrix[0][2] * matrix[1][1])
+                ],
+                [
+                    -(matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]),
+                    (matrix[0][0] * matrix[2][2] - matrix[0][2] * matrix[2][0]),
+                    -(matrix[0][0] * matrix[1][2] - matrix[0][2] * matrix[1][0])
+                ],
+                [
+                    (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]),
+                    -(matrix[0][0] * matrix[2][1] - matrix[0][1] * matrix[2][0]),
+                    (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0])
+                ]
+            ];
+            
+            // Calculate modular inverse of determinant
+            let detInv = modInverse(det, mod);
+            
+            // Calculate inverse matrix
+            let inv = [[], [], []];
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    // Apply mod and ensure positive
+                    let val = adj[i][j] * detInv;
+                    inv[i][j] = ((val % mod) + mod) % mod;
                 }
-                matrix.push(row);
+            }
+            
+            return inv;
+        }
+        
+        // Greatest common divisor
+        function gcd(a, b) {
+            if (b === 0) return a;
+            return gcd(b, a % b);
+        }
+        
+        // Modular inverse using extended Euclidean algorithm
+        function modInverse(a, m) {
+            a = ((a % m) + m) % m;
+            for (let x = 1; x < m; x++) {
+                if ((a * x) % m === 1) return x;
+            }
+            return 1;
+        }
+        
+        // Matrix multiplication mod 26
+        function matrixMultiply(a, b) {
+            let result = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    for (let k = 0; k < 3; k++) {
+                        result[i][j] += a[i][k] * b[k][j];
+                    }
+                    result[i][j] = ((result[i][j] % 26) + 26) % 26;
+                }
+            }
+            return result;
+        }
+        
+        // Generate key matrix from key word
+        function generateMatrixFromKey(key) {
+            // Pad key if needed
+            while (key.length < 9) {
+                key += key;
+            }
+            key = key.substring(0, 9);
+            
+            // Convert to uppercase and get char codes (A=0, B=1, ...)
+            key = key.toUpperCase();
+            let matrix = [[], [], []];
+            for (let i = 0; i < 9; i++) {
+                let row = Math.floor(i / 3);
+                let col = i % 3;
+                matrix[row][col] = key.charCodeAt(i) - 65;
             }
             
             return matrix;
         }
         
-        // Преобразование матрицы обратно в текст
-        function matrixToText(matrix) {
-            const blockSize = matrix.length;
-            const numBlocks = matrix[0].length;
-            const nums = [];
+        // Generate round keys from initial key matrix
+        function generateRoundKeys(keyMatrix, rounds) {
+            let roundKeys = [keyMatrix];
             
-            for (let j = 0; j < numBlocks; j++) {
-                for (let i = 0; i < blockSize; i++) {
-                    nums.push(matrix[i][j] % ALPHABET_SIZE);
-                }
-            }
-            
-            let text = '';
-            for (const num of nums) {
-                text += ALPHABET[num];
-            }
-            
-            return text;
-        }
-        
-        // Функция для вычисления НОД
-        function gcd(a, b) {
-            a = Math.abs(a);
-            b = Math.abs(b);
-            
-            while (b) {
-                const t = b;
-                b = a % b;
-                a = t;
-            }
-            return a;
-        }
-        
-        // Функция для вычисления обратного числа по модулю
-        function modInverse(a, m) {
-            a = (a % m + m) % m;
-            for (let x = 1; x < m; x++) {
-                if ((a * x) % m === 1) {
-                    return x;
-                }
-            }
-            return 1;
-        }
-        
-        // Функция для вычисления определителя матрицы
-        function matrixDeterminant(matrix) {
-            if (matrix.length === 2) {
-                return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
-            }
-            
-            let det = 0;
-            for (let i = 0; i < matrix.length; i++) {
-                const minor = [];
-                for (let j = 1; j < matrix.length; j++) {
-                    minor.push(matrix[j].filter((_, k) => k !== i));
-                }
-                det += matrix[0][i] * (i % 2 === 0 ? 1 : -1) * matrixDeterminant(minor);
-            }
-            return det;
-        }
-        
-        // Функция для вычисления обратной матрицы по модулю
-        function modInverseMatrix(matrix, mod) {
-            const size = matrix.length;
-            const det = matrixDeterminant(matrix);
-            const detInv = modInverse(det, mod);
-            
-            if (gcd(det, mod) !== 1) {
-                throw new Error("Ключевая матрица не обратима по модулю алфавита. Выберите другое ключевое слово.");
-            }
-            
-            // Матрица миноров
-            const minorMatrix = [];
-            for (let i = 0; i < size; i++) {
-                const minorRow = [];
-                for (let j = 0; j < size; j++) {
-                    const subMatrix = [];
-                    for (let k = 0; k < size; k++) {
-                        if (k === i) continue;
-                        const subRow = [];
-                        for (let l = 0; l < size; l++) {
-                            if (l === j) continue;
-                            subRow.push(matrix[k][l]);
-                        }
-                        subMatrix.push(subRow);
-                    }
-                    const minor = matrixDeterminant(subMatrix);
-                    minorRow.push((((i + j) % 2 === 0 ? 1 : -1) * minor);
-                }
-                minorMatrix.push(minorRow);
-            }
-            
-            // Транспонирование матрицы миноров (матрица алгебраических дополнений)
-            const adjugate = [];
-            for (let i = 0; i < size; i++) {
-                adjugate.push([]);
-                for (let j = 0; j < size; j++) {
-                    adjugate[i].push(minorMatrix[j][i]);
-                }
-            }
-            
-            // Умножение на обратный определитель по модулю
-            const inverse = [];
-            for (let i = 0; i < size; i++) {
-                inverse.push([]);
-                for (let j = 0; j < size; j++) {
-                    inverse[i].push((adjugate[i][j] * detInv) % mod);
-                    // Убедимся, что результат положительный
-                    if (inverse[i][j] < 0) {
-                        inverse[i][j] += mod;
+            for (let i = 1; i < rounds; i++) {
+                // Generate new key matrix by multiplying with itself
+                let newKey = matrixMultiply(roundKeys[i-1], roundKeys[i-1]);
+                
+                // Add some key-dependent variation
+                for (let row = 0; row < 3; row++) {
+                    for (let col = 0; col < 3; col++) {
+                        newKey[row][col] = (newKey[row][col] + i + row + col) % 26;
                     }
                 }
+                
+                roundKeys.push(newKey);
             }
             
-            return inverse;
+            return roundKeys;
         }
         
-        // Генерация ключевой матрицы
-        function generateKeyMatrix(keyWord, blockSize) {
-            keyWord = keyWord.toUpperCase().replace(/ /g, '');
-            const keyNums = [];
-            for (const c of keyWord) {
-                keyNums.push(ALPHABET.indexOf(c));
-            }
-            
-            // Дополняем ключ, если он слишком короткий
-            while (keyNums.length < blockSize * blockSize) {
-                for (let i = 0; i < blockSize * blockSize - keyNums.length; i++) {
-                    keyNums.push(keyNums.length % ALPHABET_SIZE);
-                }
-            }
-            
-            // Формируем матрицу
-            const keyMatrix = [];
-            for (let i = 0; i < blockSize; i++) {
-                const row = [];
-                for (let j = 0; j < blockSize; j++) {
-                    row.push(keyNums[i * blockSize + j]);
-                }
-                keyMatrix.push(row);
-            }
-            
-            // Проверяем, что матрица обратима
-            const det = matrixDeterminant(keyMatrix);
-            if (gcd(det, ALPHABET_SIZE) !== 1) {
-                throw new Error("Ключевая матрица не обратима по модулю алфавита. Выберите другое ключевое слово.");
-            }
-            
-            return keyMatrix;
-        }
-        
-        // Применение S-Box
-        function applySbox(matrix) {
-            const result = [];
-            for (let i = 0; i < matrix.length; i++) {
-                result.push([]);
-                for (let j = 0; j < matrix[i].length; j++) {
-                    result[i].push(S_BOX[matrix[i][j]]);
-                }
-            }
-            return result;
-        }
-        
-        // Применение обратного S-Box
-        function applyInverseSbox(matrix) {
-            const result = [];
-            for (let i = 0; i < matrix.length; i++) {
-                result.push([]);
-                for (let j = 0; j < matrix[i].length; j++) {
-                    result[i].push(INVERSE_S_BOX[matrix[i][j]]);
-                }
-            }
-            return result;
-        }
-        
-        // Умножение матриц по модулю
-        function matrixMultiply(a, b, mod) {
-            const result = [];
-            for (let i = 0; i < a.length; i++) {
-                result.push([]);
-                for (let j = 0; j < b[0].length; j++) {
-                    let sum = 0;
-                    for (let k = 0; k < a[0].length; k++) {
-                        sum += a[i][k] * b[k][j];
-                    }
-                    result[i].push(sum % mod);
-                }
-            }
-            return result;
-        }
-        
-        // Шифрование
-        function hillEncrypt(plaintext, keyWord, rounds, blockSize) {
-            const keyMatrix = generateKeyMatrix(keyWord, blockSize);
-            const invKeyMatrix = modInverseMatrix(keyMatrix, ALPHABET_SIZE);
-            
-            let matrix = textToMatrix(plaintext, blockSize);
-            
-            for (let i = 0; i < rounds; i++) {
-                // Линейное преобразование
-                matrix = matrixMultiply(keyMatrix, matrix, ALPHABET_SIZE);
-                // Нелинейное преобразование
-                matrix = applySbox(matrix);
-            }
-            
-            return matrixToText(matrix);
-        }
-        
-        // Дешифрование
-        function hillDecrypt(ciphertext, keyWord, rounds, blockSize) {
-            const keyMatrix = generateKeyMatrix(keyWord, blockSize);
-            const invKeyMatrix = modInverseMatrix(keyMatrix, ALPHABET_SIZE);
-            
-            let matrix = textToMatrix(ciphertext, blockSize);
-            
-            for (let i = 0; i < rounds; i++) {
-                // Обратное нелинейное преобразование
-                matrix = applyInverseSbox(matrix);
-                // Линейное преобразование
-                matrix = matrixMultiply(invKeyMatrix, matrix, ALPHABET_SIZE);
-            }
-            
-            return matrixToText(matrix);
-        }
-        
-        // Визуализация распределения букв
-        function plotLetterDistribution(text, title, elementId) {
-            text = text.toUpperCase();
-            const letters = Array.from(text).filter(c => ALPHABET.includes(c));
-            const counts = {};
-            
-            // Инициализация счетчиков
-            for (const letter of ALPHABET) {
-                counts[letter] = 0;
-            }
-            
-            // Подсчет букв
-            for (const letter of letters) {
-                counts[letter]++;
-            }
-            
-            // Подготовка данных для графика
-            const xValues = [];
-            const yValues = [];
-            
-            for (const letter in counts) {
-                xValues.push(letter);
-                yValues.push(counts[letter]);
-            }
-            
-            // Создание графика
-            const data = [{
-                x: xValues,
-                y: yValues,
-                type: 'bar'
-            }];
-            
-            const layout = {
-                title: title,
-                xaxis: { title: 'Буквы' },
-                yaxis: { title: 'Частота' }
-            };
-            
-            Plotly.newPlot(elementId, data, layout);
-        }
-        
-        // Обработка формы
-        function process(action) {
-            const text = document.getElementById('text').value;
-            const key = document.getElementById('key').value;
-            const rounds = parseInt(document.getElementById('rounds').value);
-            const blockSize = parseInt(document.getElementById('block_size').value);
-            
-            document.getElementById('error').textContent = '';
-            document.getElementById('results').style.display = 'none';
-            
+        // Encrypt plaintext
+        function encrypt() {
             try {
-                let result;
-                if (action === 'encrypt') {
-                    result = hillEncrypt(text, key, rounds, blockSize);
-                } else {
-                    result = hillDecrypt(text, key, rounds, blockSize);
+                let plaintext = document.getElementById('plaintext').value.toUpperCase().replace(/[^A-Z]/g, '');
+                if (!plaintext) {
+                    showAlert('Please enter plaintext to encrypt', 'error');
+                    return;
                 }
                 
-                document.getElementById('resultText').textContent = result;
-                document.getElementById('results').style.display = 'flex';
+                let keyWord = document.getElementById('keyWord').value;
+                if (!keyWord) {
+                    showAlert('Please enter a key word', 'error');
+                    return;
+                }
                 
-                // Визуализация распределения букв
-                plotLetterDistribution(text, "Исходный текст", "originalPlot");
-                plotLetterDistribution(result, "Результат", "resultPlot");
+                let rounds = parseInt(document.getElementById('rounds').value);
+                if (isNaN(rounds) rounds = 3;
                 
-            } catch (e) {
-                document.getElementById('error').textContent = 'Ошибка: ' + e.message;
+                // Get key matrix from UI
+                let keyMatrix = getMatrixFromUI('keyMatrix');
+                if (!keyMatrix) return;
+                
+                // Validate matrix is invertible
+                let invMatrix = modMatInv(keyMatrix, 26);
+                if (!invMatrix) {
+                    showAlert('Key matrix is not invertible (determinant must be coprime with 26)', 'error');
+                    return;
+                }
+                
+                // Generate S-box from key
+                let sbox = generateSBox(keyWord);
+                
+                // Generate round keys
+                let roundKeys = generateRoundKeys(keyMatrix, rounds);
+                
+                // Pad plaintext to be multiple of 3
+                while (plaintext.length % 3 !== 0) {
+                    plaintext += 'X';
+                }
+                
+                let processLog = `Starting encryption with ${rounds} rounds...\n\n`;
+                let ciphertextNumbers = [];
+                
+                // Convert plaintext to numbers (A=0, B=1, ..., Z=25)
+                let plainNumbers = [];
+                for (let i = 0; i < plaintext.length; i++) {
+                    plainNumbers.push(plaintext.charCodeAt(i) - 65);
+                }
+                
+                processLog += `Plaintext as numbers: ${plainNumbers.join(' ')}\n\n`;
+                
+                // Apply each round
+                let currentNumbers = [...plainNumbers];
+                for (let round = 0; round < rounds; round++) {
+                    processLog += `=== Round ${round + 1} ===\n`;
+                    processLog += `Key matrix:\n${matrixToString(roundKeys[round])}\n`;
+                    
+                    // Apply Hill cipher matrix multiplication
+                    let roundResult = [];
+                    for (let i = 0; i < currentNumbers.length; i += 3) {
+                        let vector = [
+                            currentNumbers[i],
+                            currentNumbers[i+1],
+                            currentNumbers[i+2]
+                        ];
+                        
+                        // Matrix multiplication
+                        let encrypted = [
+                            (roundKeys[round][0][0] * vector[0] + roundKeys[round][0][1] * vector[1] + roundKeys[round][0][2] * vector[2]) % 26,
+                            (roundKeys[round][1][0] * vector[0] + roundKeys[round][1][1] * vector[1] + roundKeys[round][1][2] * vector[2]) % 26,
+                            (roundKeys[round][2][0] * vector[0] + roundKeys[round][2][1] * vector[1] + roundKeys[round][2][2] * vector[2]) % 26
+                        ];
+                        
+                        // Ensure positive
+                        encrypted = encrypted.map(x => (x + 26) % 26);
+                        
+                        // Apply S-box substitution
+                        let substituted = encrypted.map(x => sbox[x]);
+                        
+                        roundResult.push(...substituted);
+                        
+                        processLog += `Block ${i/3 + 1}: [${vector.join(', ')}] -> [${encrypted.join(', ')}] -> [${substituted.join(', ')}]\n`;
+                    }
+                    
+                    currentNumbers = roundResult;
+                    processLog += `After round ${round + 1}: ${currentNumbers.join(' ')}\n\n`;
+                }
+                
+                ciphertextNumbers = currentNumbers;
+                
+                // Display results
+                document.getElementById('ciphertextResult').textContent = ciphertextNumbers.join(' ');
+                document.getElementById('encryptionProcess').textContent = processLog;
+                
+                showAlert('Encryption successful!', 'success');
+            } catch (error) {
+                showAlert('Error during encryption: ' + error.message, 'error');
+                console.error(error);
             }
+        }
+        
+        // Decrypt ciphertext
+        function decrypt() {
+            try {
+                let ciphertext = document.getElementById('ciphertextNumbers').value.trim();
+                if (!ciphertext) {
+                    showAlert('Please enter ciphertext numbers to decrypt', 'error');
+                    return;
+                }
+                
+                // Parse ciphertext numbers
+                let cipherNumbers = ciphertext.split(/\s+/).map(Number);
+                if (cipherNumbers.some(isNaN)) {
+                    showAlert('Ciphertext must contain only numbers separated by spaces', 'error');
+                    return;
+                }
+                
+                // Check length is multiple of 3
+                if (cipherNumbers.length % 3 !== 0) {
+                    showAlert('Ciphertext length must be a multiple of 3', 'error');
+                    return;
+                }
+                
+                let keyWord = document.getElementById('decryptKeyWord').value;
+                if (!keyWord) {
+                    showAlert('Please enter a key word', 'error');
+                    return;
+                }
+                
+                let rounds = parseInt(document.getElementById('decryptRounds').value);
+                if (isNaN(rounds)) rounds = 3;
+                
+                // Get key matrix from UI
+                let keyMatrix = getMatrixFromUI('decryptKeyMatrix');
+                if (!keyMatrix) return;
+                
+                // Validate matrix is invertible
+                let invMatrix = modMatInv(keyMatrix, 26);
+                if (!invMatrix) {
+                    showAlert('Key matrix is not invertible (determinant must be coprime with 26)', 'error');
+                    return;
+                }
+                
+                // Generate S-box and inverse S-box from key
+                let sbox = generateSBox(keyWord);
+                let inverseSbox = generateInverseSBox(sbox);
+                
+                // Generate round keys (for decryption we need them in reverse order)
+                let roundKeys = generateRoundKeys(keyMatrix, rounds);
+                
+                let processLog = `Starting decryption with ${rounds} rounds...\n\n`;
+                processLog += `Ciphertext numbers: ${cipherNumbers.join(' ')}\n\n`;
+                
+                // Apply each round in reverse
+                let currentNumbers = [...cipherNumbers];
+                for (let round = rounds - 1; round >= 0; round--) {
+                    processLog += `=== Round ${rounds - round} (original round ${round + 1}) ===\n`;
+                    processLog += `Key matrix inverse:\n${matrixToString(modMatInv(roundKeys[round], 26))}\n`;
+                    
+                    // Apply inverse S-box first
+                    let substituted = currentNumbers.map(x => inverseSbox[x]);
+                    
+                    // Then apply inverse Hill cipher matrix multiplication
+                    let roundResult = [];
+                    for (let i = 0; i < substituted.length; i += 3) {
+                        let vector = [
+                            substituted[i],
+                            substituted[i+1],
+                            substituted[i+2]
+                        ];
+                        
+                        // Get inverse matrix for this round
+                        let invMatrix = modMatInv(roundKeys[round], 26);
+                        
+                        // Matrix multiplication with inverse
+                        let decrypted = [
+                            (invMatrix[0][0] * vector[0] + invMatrix[0][1] * vector[1] + invMatrix[0][2] * vector[2]) % 26,
+                            (invMatrix[1][0] * vector[0] + invMatrix[1][1] * vector[1] + invMatrix[1][2] * vector[2]) % 26,
+                            (invMatrix[2][0] * vector[0] + invMatrix[2][1] * vector[1] + invMatrix[2][2] * vector[2]) % 26
+                        ];
+                        
+                        // Ensure positive
+                        decrypted = decrypted.map(x => (x + 26) % 26);
+                        
+                        roundResult.push(...decrypted);
+                        
+                        processLog += `Block ${i/3 + 1}: [${vector.join(', ')}] -> [${decrypted.join(', ')}]\n`;
+                    }
+                    
+                    currentNumbers = roundResult;
+                    processLog += `After round ${rounds - round}: ${currentNumbers.join(' ')}\n\n`;
+                }
+                
+                // Convert numbers back to letters
+                let plaintext = currentNumbers.map(x => String.fromCharCode(x + 65)).join('');
+                
+                // Display results
+                document.getElementById('decryptedText').textContent = plaintext;
+                document.getElementById('decryptionProcess').textContent = processLog;
+                
+                showAlert('Decryption successful!', 'success');
+            } catch (error) {
+                showAlert('Error during decryption: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+        
+        // Helper function to get matrix from UI
+        function getMatrixFromUI(elementId) {
+            let inputs = document.getElementById(elementId).getElementsByTagName('input');
+            let matrix = [[], [], []];
+            
+            for (let i = 0; i < 9; i++) {
+                let row = Math.floor(i / 3);
+                let col = i % 3;
+                let value = parseInt(inputs[i].value);
+                
+                if (isNaN(value)) {
+                    showAlert('Please enter valid numbers in all matrix cells', 'error');
+                    return null;
+                }
+                
+                matrix[row][col] = value;
+            }
+            
+            return matrix;
+        }
+        
+        // Generate key matrix from key word
+        function generateKeyMatrix() {
+            let keyWord = document.getElementById('keyWord').value;
+            if (!keyWord) {
+                showAlert('Please enter a key word first', 'error');
+                return;
+            }
+            
+            let matrix = generateMatrixFromKey(keyWord);
+            let inputs = document.getElementById('keyMatrix').getElementsByTagName('input');
+            
+            for (let i = 0; i < 9; i++) {
+                let row = Math.floor(i / 3);
+                let col = i % 3;
+                inputs[i].value = matrix[row][col];
+            }
+            
+            showAlert('Key matrix generated from key word', 'success');
+        }
+        
+        // Generate decrypt key matrix from key word
+        function generateDecryptKeyMatrix() {
+            let keyWord = document.getElementById('decryptKeyWord').value;
+            if (!keyWord) {
+                showAlert('Please enter a key word first', 'error');
+                return;
+            }
+            
+            let matrix = generateMatrixFromKey(keyWord);
+            let inputs = document.getElementById('decryptKeyMatrix').getElementsByTagName('input');
+            
+            for (let i = 0; i < 9; i++) {
+                let row = Math.floor(i / 3);
+                let col = i % 3;
+                inputs[i].value = matrix[row][col];
+            }
+            
+            showAlert('Key matrix generated from key word', 'success');
+        }
+        
+        // Validate matrix is invertible
+        function validateMatrix() {
+            let matrix = getMatrixFromUI('keyMatrix');
+            if (!matrix) return;
+            
+            let invMatrix = modMatInv(matrix, 26);
+            if (invMatrix) {
+                showAlert('Matrix is valid and invertible', 'success');
+            } else {
+                showAlert('Matrix is not invertible (determinant must be coprime with 26)', 'error');
+            }
+        }
+        
+        function validateDecryptMatrix() {
+            let matrix = getMatrixFromUI('decryptKeyMatrix');
+            if (!matrix) return;
+            
+            let invMatrix = modMatInv(matrix, 26);
+            if (invMatrix) {
+                showAlert('Matrix is valid and invertible', 'success');
+            } else {
+                showAlert('Matrix is not invertible (determinant must be coprime with 26)', 'error');
+            }
+        }
+        
+        // Helper function to show alerts
+        function showAlert(message, type) {
+            let alertBox = document.getElementById('alertBox');
+            alertBox.textContent = message;
+            alertBox.className = 'alert alert-' + type;
+            alertBox.style.display = 'block';
+            
+            setTimeout(() => {
+                alertBox.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Helper function to format matrix as string
+        function matrixToString(matrix) {
+            return matrix.map(row => row.join('\t')).join('\n');
+        }
+        
+        // Tab switching
+        function openTab(evt, tabName) {
+            let tabContents = document.getElementsByClassName('tab-content');
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove('active');
+            }
+            
+            let tabs = document.getElementsByClassName('tab');
+            for (let i = 0; i < tabs.length; i++) {
+                tabs[i].classList.remove('active');
+            }
+            
+            document.getElementById(tabName).classList.add('active');
+            evt.currentTarget.classList.add('active');
         }
     </script>
 </body>
