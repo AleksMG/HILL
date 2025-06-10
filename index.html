@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Усиленный шифр Хилла с динамическими S-Box</title>
+    <title>Улучшенный шифр Хилла с раундовыми ключами</title>
     <style>
         body {
             font-family: 'Courier New', monospace;
@@ -77,65 +77,42 @@
         .invalid {
             color: red;
         }
+        .round-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Усиленный шифр Хилла с динамическими S-Box</h1>
+        <h1>Улучшенный шифр Хилла с раундовыми ключами</h1>
         
         <div class="section">
             <h2>Ключевые параметры</h2>
             <div class="key-inputs">
                 <div>
-                    <label for="matrix-key">Ключевое слово для матрицы:</label>
-                    <input type="text" id="matrix-key" value="SECRET">
-                    <div id="matrix-key-status" class="status"></div>
-                </div>
-                <div>
-                    <label for="sbox-key">Ключевое слово для S-Box:</label>
-                    <input type="text" id="sbox-key" value="CRYPTO">
-                    <div id="sbox-key-status" class="status"></div>
+                    <label for="main-key">Основной ключ:</label>
+                    <input type="text" id="main-key" value="CRYPTOGRAPHY">
+                    <div id="main-key-status" class="status"></div>
                 </div>
             </div>
-            <div>
+            <div class="round-controls">
                 <label for="rounds">Количество раундов:</label>
                 <select id="rounds">
-                    <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3" selected>3</option>
                     <option value="4">4</option>
                     <option value="5">5</option>
                 </select>
+                <button id="show-rounds">Показать раундовые ключи</button>
             </div>
-            <button id="generate-keys">Сгенерировать ключи</button>
-        </div>
-        
-        <div class="section">
-            <h2>Ключевая матрица</h2>
-            <div class="matrix-input" id="matrix-container">
-                <input type="number" id="m00" readonly>
-                <input type="number" id="m01" readonly>
-                <input type="number" id="m02" readonly>
-                <input type="number" id="m10" readonly>
-                <input type="number" id="m11" readonly>
-                <input type="number" id="m12" readonly>
-                <input type="number" id="m20" readonly>
-                <input type="number" id="m21" readonly>
-                <input type="number" id="m22" readonly>
-            </div>
-            <button id="check-matrix">Проверить обратимость матрицы</button>
-            <div id="matrix-status" class="result"></div>
-        </div>
-        
-        <div class="section">
-            <h2>S-Box (подстановочная таблица)</h2>
-            <input type="text" id="sbox-input" readonly>
-            <div id="sbox-status" class="result"></div>
+            <div id="round-keys-info" class="result" style="display:none;"></div>
         </div>
         
         <div class="section">
             <h2>Шифрование/Дешифрование</h2>
-            <textarea id="input-text" rows="4" placeholder="Введите текст для шифрования (только буквы A-Z)"></textarea>
+            <textarea id="input-text" rows="4" placeholder="Введите текст (только буквы A-Z)"></textarea>
             <button id="encrypt-btn">Зашифровать</button>
             <button id="decrypt-btn">Расшифровать</button>
             <div class="result" id="output-text"></div>
@@ -144,153 +121,83 @@
 
     <script>
         // Инициализация элементов
-        const matrixKeyInput = document.getElementById('matrix-key');
-        const sboxKeyInput = document.getElementById('sbox-key');
-        const matrixKeyStatus = document.getElementById('matrix-key-status');
-        const sboxKeyStatus = document.getElementById('sbox-key-status');
+        const mainKeyInput = document.getElementById('main-key');
+        const mainKeyStatus = document.getElementById('main-key-status');
         const roundsSelect = document.getElementById('rounds');
-        const generateKeysBtn = document.getElementById('generate-keys');
-        const matrixInputs = document.querySelectorAll('.matrix-input input');
-        const checkMatrixBtn = document.getElementById('check-matrix');
-        const matrixStatus = document.getElementById('matrix-status');
-        const sboxInput = document.getElementById('sbox-input');
-        const sboxStatus = document.getElementById('sbox-status');
+        const showRoundsBtn = document.getElementById('show-rounds');
+        const roundKeysInfo = document.getElementById('round-keys-info');
         const inputText = document.getElementById('input-text');
         const encryptBtn = document.getElementById('encrypt-btn');
         const decryptBtn = document.getElementById('decrypt-btn');
         const outputText = document.getElementById('output-text');
         
-        // Проверка ключевого слова
-        function validateKey(key, type) {
+        // Проверка ключа
+        function validateKey(key) {
             const cleanKey = key.toUpperCase().replace(/[^A-Z]/g, '');
-            if (cleanKey.length < 3) {
-                return { valid: false, message: `Ключевое слово для ${type} должно содержать хотя бы 3 буквы` };
+            if (cleanKey.length < 6) {
+                return { valid: false, message: "Ключ должен содержать хотя бы 6 букв" };
             }
             return { valid: true, key: cleanKey };
         }
         
-        // Генерация матрицы из ключевого слова
-        function generateMatrixFromKey(key) {
-            const numbers = [];
-            for (let i = 0; i < 9; i++) {
-                const char = key[i % key.length];
-                numbers.push(char.charCodeAt(0) - 65);
+        // Генерация раундовых ключей
+        function generateRoundKeys(key, rounds) {
+            const keys = [];
+            const keyNumbers = Array.from(key).map(c => c.charCodeAt(0) - 65);
+            
+            for (let round = 0; round < rounds; round++) {
+                // Создаем уникальную матрицу для каждого раунда
+                const matrix = [];
+                for (let i = 0; i < 3; i++) {
+                    const row = [];
+                    for (let j = 0; j < 3; j++) {
+                        const index = (round * 9 + i * 3 + j) % keyNumbers.length;
+                        let val = keyNumbers[index] + round * 7 + i * 5 + j * 3;
+                        val = val % 26;
+                        if (val < 0) val += 26;
+                        row.push(val);
+                    }
+                    matrix.push(row);
+                }
+                keys.push(matrix);
             }
             
-            return [
-                [numbers[0], numbers[1], numbers[2]],
-                [numbers[3], numbers[4], numbers[5]],
-                [numbers[6], numbers[7], numbers[8]]
-            ];
+            return keys;
         }
         
-        // Генерация S-Box из ключевого слова
-        function generateSBoxFromKey(key) {
-            // Начальная последовательность
+        // Генерация S-Box для раунда
+        function generateSBoxForRound(key, round) {
             let sbox = [];
             for (let i = 0; i < 26; i++) {
                 sbox.push(i);
             }
             
-            // Перемешивание с использованием ключа
-            let shuffled = [];
-            const keyNumbers = [];
-            for (const char of key) {
-                keyNumbers.push(char.charCodeAt(0) - 65);
-            }
-            
+            // Перемешивание с использованием ключа и номера раунда
+            const keyNumbers = Array.from(key).map(c => c.charCodeAt(0) - 65);
             let currentIndex = sbox.length;
-            let keyIndex = 0;
             
             while (currentIndex > 0) {
-                const randomPart = keyNumbers[keyIndex % keyNumbers.length];
-                const randomIndex = (randomPart + keyIndex) % currentIndex;
+                const keyPart = keyNumbers[(round * 26 + currentIndex) % keyNumbers.length];
+                const randomIndex = (keyPart + round * 17 + currentIndex * 13) % currentIndex;
                 currentIndex--;
                 
-                // Меняем местами
                 [sbox[currentIndex], sbox[randomIndex]] = [sbox[randomIndex], sbox[currentIndex]];
-                
-                keyIndex++;
             }
             
             return sbox;
-        }
-        
-        // Обновление интерфейса с матрицей
-        function updateMatrixUI(matrix) {
-            for (let i = 0; i < 3; i++) {
-                for (let j = 0; j < 3; j++) {
-                    document.getElementById(`m${i}${j}`).value = matrix[i][j];
-                }
-            }
-        }
-        
-        // Обновление интерфейса с S-Box
-        function updateSBoxUI(sbox) {
-            sboxInput.value = sbox.join(', ');
-        }
-        
-        // Проверка и создание S-Box
-        function validateSBox(sbox) {
-            if (sbox.length !== 26) {
-                sboxStatus.textContent = "Ошибка: S-Box должен содержать 26 значений";
-                return null;
-            }
-            
-            const unique = new Set(sbox);
-            if (unique.size !== 26) {
-                sboxStatus.textContent = "Ошибка: значения в S-Box должны быть уникальными";
-                return null;
-            }
-            
-            for (const val of sbox) {
-                if (isNaN(val) || val < 0 || val > 25) {
-                    sboxStatus.textContent = "Ошибка: значения в S-Box должны быть числами от 0 до 25";
-                    return null;
-                }
-            }
-            
-            sboxStatus.textContent = "S-Box валиден";
-            return sbox;
-        }
-        
-        // Создание обратного S-Box
-        function createInverseSBox(sbox) {
-            const inverse = new Array(26);
-            for (let i = 0; i < 26; i++) {
-                inverse[sbox[i]] = i;
-            }
-            return inverse;
-        }
-        
-        // Получение матрицы из ввода
-        function getMatrix() {
-            const matrix = [];
-            for (let i = 0; i < 3; i++) {
-                const row = [];
-                for (let j = 0; j < 3; j++) {
-                    const val = parseInt(document.getElementById(`m${i}${j}`).value);
-                    row.push(val);
-                }
-                matrix.push(row);
-            }
-            return matrix;
         }
         
         // Проверка обратимости матрицы
         function isMatrixInvertible(matrix) {
-            // Вычисляем определитель
             const a = matrix[0][0], b = matrix[0][1], c = matrix[0][2];
             const d = matrix[1][0], e = matrix[1][1], f = matrix[1][2];
             const g = matrix[2][0], h = matrix[2][1], i = matrix[2][2];
             
             const det = a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g);
-            
-            // Матрица обратима по модулю 26, если det и 26 взаимно просты
             return gcd(det, 26) === 1;
         }
         
-        // НОД (алгоритм Евклида)
+        // НОД
         function gcd(a, b) {
             a = Math.abs(a);
             b = Math.abs(b);
@@ -308,11 +215,9 @@
             const d = matrix[1][0], e = matrix[1][1], f = matrix[1][2];
             const g = matrix[2][0], h = matrix[2][1], k = matrix[2][2];
             
-            // Вычисляем определитель
             const det = a*(e*k - f*h) - b*(d*k - f*g) + c*(d*h - e*g);
             const detInv = modInverse(det, 26);
             
-            // Матрица миноров
             const minor00 = (e*k - f*h) * detInv % 26;
             const minor01 = (d*k - f*g) * detInv % 26;
             const minor02 = (d*h - e*g) * detInv % 26;
@@ -323,7 +228,6 @@
             const minor21 = (a*f - c*d) * detInv % 26;
             const minor22 = (a*e - b*d) * detInv % 26;
             
-            // Обратная матрица (транспонированная матрица алгебраических дополнений)
             return [
                 [positiveMod(minor00, 26), positiveMod(-minor10, 26), positiveMod(minor20, 26)],
                 [positiveMod(-minor01, 26), positiveMod(minor11, 26), positiveMod(-minor21, 26)],
@@ -363,8 +267,12 @@
         }
         
         // Обратное применение S-Box
-        function applyInverseSBox(numbers, inverseSbox) {
-            return numbers.map(n => inverseSbox[n]);
+        function applyInverseSBox(numbers, sbox) {
+            const inverse = new Array(26);
+            for (let i = 0; i < 26; i++) {
+                inverse[sbox[i]] = i;
+            }
+            return numbers.map(n => inverse[n]);
         }
         
         // Шифрование блока
@@ -392,17 +300,25 @@
                 return;
             }
             
-            const matrix = getMatrix();
-            if (!isMatrixInvertible(matrix)) {
-                outputText.textContent = "Ошибка: матрица необратима по модулю 26";
+            const keyResult = validateKey(mainKeyInput.value);
+            if (!keyResult.valid) {
+                mainKeyStatus.textContent = keyResult.message;
+                mainKeyStatus.className = 'status invalid';
                 return;
             }
+            mainKeyStatus.textContent = "Ключ валиден";
+            mainKeyStatus.className = 'status valid';
             
-            const sbox = validateSBox(sboxInput.value.split(',').map(x => parseInt(x.trim())));
-            if (!sbox) return;
-            
-            const inverseSbox = createInverseSBox(sbox);
             const rounds = parseInt(roundsSelect.value);
+            const roundKeys = generateRoundKeys(keyResult.key, rounds);
+            
+            // Проверка всех матриц на обратимость
+            for (let i = 0; i < roundKeys.length; i++) {
+                if (!isMatrixInvertible(roundKeys[i])) {
+                    outputText.textContent = `Ошибка: матрица для раунда ${i+1} необратима по модулю 26. Попробуйте другой ключ.`;
+                    return;
+                }
+            }
             
             let numbers = textToNumbers(text);
             if (numbers.length === 0) {
@@ -412,28 +328,29 @@
             
             // Дополнение до кратного 3
             const paddingLength = (3 - (numbers.length % 3)) % 3;
-            const paddedNumbers = [...numbers, ...Array(paddingLength).fill(23)]; // 23 = 'X'
+            const paddedNumbers = [...numbers, ...Array(paddingLength).fill(23)]; // X
             
-            // Многократное шифрование (раунды)
+            // Шифрование с несколькими раундами
             let processedNumbers = [...paddedNumbers];
             
             for (let round = 0; round < rounds; round++) {
-                // Применение S-Box перед шифрованием (кроме последнего раунда)
-                if (round > 0 || rounds === 1) {
-                    processedNumbers = applySBox(processedNumbers, sbox);
-                }
+                const sbox = generateSBoxForRound(keyResult.key, round);
+                const inverseSbox = generateSBoxForRound(keyResult.key, round + 100); // Разный S-Box для обратного преобразования
                 
-                // Разбиение на блоки и шифрование
+                // Применение S-Box
+                processedNumbers = applySBox(processedNumbers, sbox);
+                
+                // Шифрование матрицей
                 const encryptedBlocks = [];
                 for (let i = 0; i < processedNumbers.length; i += 3) {
                     const block = processedNumbers.slice(i, i + 3);
-                    const encryptedBlock = encryptBlock(block, matrix);
+                    const encryptedBlock = encryptBlock(block, roundKeys[round]);
                     encryptedBlocks.push(...encryptedBlock);
                 }
                 
                 processedNumbers = encryptedBlocks;
                 
-                // Применение обратного S-Box после шифрования (кроме последнего раунда)
+                // Применение обратного S-Box (кроме последнего раунда)
                 if (round < rounds - 1) {
                     processedNumbers = applyInverseSBox(processedNumbers, inverseSbox);
                 }
@@ -450,18 +367,20 @@
                 return;
             }
             
-            const matrix = getMatrix();
-            if (!isMatrixInvertible(matrix)) {
-                outputText.textContent = "Ошибка: матрица необратима по модулю 26";
+            const keyResult = validateKey(mainKeyInput.value);
+            if (!keyResult.valid) {
+                mainKeyStatus.textContent = keyResult.message;
+                mainKeyStatus.className = 'status invalid';
                 return;
             }
+            mainKeyStatus.textContent = "Ключ валиден";
+            mainKeyStatus.className = 'status valid';
             
-            const inverseMat = inverseMatrix(matrix);
-            const sbox = validateSBox(sboxInput.value.split(',').map(x => parseInt(x.trim())));
-            if (!sbox) return;
-            
-            const inverseSbox = createInverseSBox(sbox);
             const rounds = parseInt(roundsSelect.value);
+            const roundKeys = generateRoundKeys(keyResult.key, rounds);
+            
+            // Генерация обратных матриц
+            const inverseRoundKeys = roundKeys.map(matrix => inverseMatrix(matrix)).reverse();
             
             let numbers = textToNumbers(text);
             if (numbers.length === 0 || numbers.length % 3 !== 0) {
@@ -469,38 +388,39 @@
                 return;
             }
             
-            // Многократное дешифрование (раунды в обратном порядке)
+            // Дешифрование с несколькими раундами (в обратном порядке)
             let processedNumbers = [...numbers];
             
-            for (let round = rounds - 1; round >= 0; round--) {
-                // Применение S-Box перед дешифрованием (кроме первого раунда)
-                if (round < rounds - 1) {
+            for (let round = 0; round < rounds; round++) {
+                const sboxRound = rounds - 1 - round;
+                const sbox = generateSBoxForRound(keyResult.key, sboxRound + 100); // Обратный S-Box
+                const inverseSbox = generateSBoxForRound(keyResult.key, sboxRound); // Прямой S-Box
+                
+                // Применение S-Box (кроме первого раунда)
+                if (round > 0) {
                     processedNumbers = applySBox(processedNumbers, sbox);
                 }
                 
-                // Разбиение на блоки и дешифрование
+                // Дешифрование матрицей
                 const decryptedBlocks = [];
                 for (let i = 0; i < processedNumbers.length; i += 3) {
                     const block = processedNumbers.slice(i, i + 3);
-                    const decryptedBlock = decryptBlock(block, inverseMat);
+                    const decryptedBlock = decryptBlock(block, inverseRoundKeys[round]);
                     decryptedBlocks.push(...decryptedBlock);
                 }
                 
                 processedNumbers = decryptedBlocks;
                 
-                // Применение обратного S-Box после дешифрования (кроме первого раунда)
-                if (round > 0) {
-                    processedNumbers = applyInverseSBox(processedNumbers, inverseSbox);
-                }
+                // Применение обратного S-Box
+                processedNumbers = applyInverseSBox(processedNumbers, inverseSbox);
             }
             
-            // Удаление дополнения (если было)
+            // Удаление дополнения
             let padding = 0;
             if (processedNumbers.length > 0) {
                 const lastChar = processedNumbers[processedNumbers.length - 1];
-                if (lastChar === 23) { // 'X'
+                if (lastChar === 23) {
                     padding = 1;
-                    // Проверяем, не было ли нескольких 'X' в конце
                     for (let i = processedNumbers.length - 2; i >= 0 && processedNumbers[i] === 23; i--) {
                         padding++;
                     }
@@ -511,66 +431,44 @@
             outputText.textContent = numbersToText(finalNumbers);
         }
         
-        // Генерация ключей
-        function generateKeys() {
-            // Проверка ключа матрицы
-            const matrixKeyResult = validateKey(matrixKeyInput.value, 'матрицы');
-            if (!matrixKeyResult.valid) {
-                matrixKeyStatus.textContent = matrixKeyResult.message;
-                matrixKeyStatus.className = 'status invalid';
+        // Показать раундовые ключи
+        function showRoundKeys() {
+            const keyResult = validateKey(mainKeyInput.value);
+            if (!keyResult.valid) {
+                roundKeysInfo.textContent = keyResult.message;
+                roundKeysInfo.style.display = 'block';
                 return;
             }
-            matrixKeyStatus.textContent = "Ключевое слово для матрицы валидно";
-            matrixKeyStatus.className = 'status valid';
             
-            // Проверка ключа S-Box
-            const sboxKeyResult = validateKey(sboxKeyInput.value, 'S-Box');
-            if (!sboxKeyResult.valid) {
-                sboxKeyStatus.textContent = sboxKeyResult.message;
-                sboxKeyStatus.className = 'status invalid';
-                return;
-            }
-            sboxKeyStatus.textContent = "Ключевое слово для S-Box валидно";
-            sboxKeyStatus.className = 'status valid';
+            const rounds = parseInt(roundsSelect.value);
+            const roundKeys = generateRoundKeys(keyResult.key, rounds);
             
-            // Генерация матрицы
-            const matrix = generateMatrixFromKey(matrixKeyResult.key);
-            updateMatrixUI(matrix);
+            let info = `<h3>Раундовые ключи (${rounds}):</h3>`;
             
-            // Проверка обратимости матрицы
-            if (!isMatrixInvertible(matrix)) {
-                matrixStatus.textContent = "Предупреждение: сгенерированная матрица необратима по модулю 26. Попробуйте другое ключевое слово.";
-                matrixStatus.style.color = "red";
-            } else {
-                matrixStatus.textContent = "Сгенерированная матрица обратима по модулю 26";
-                matrixStatus.style.color = "green";
+            for (let i = 0; i < roundKeys.length; i++) {
+                info += `<p><strong>Раунд ${i+1}:</strong><br>`;
+                info += `Матрица: [${roundKeys[i][0].join(', ')}], [${roundKeys[i][1].join(', ')}], [${roundKeys[i][2].join(', ')}]<br>`;
+                
+                const sbox = generateSBoxForRound(keyResult.key, i);
+                info += `S-Box: ${sbox.join(', ')}</p>`;
             }
             
-            // Генерация S-Box
-            const sbox = generateSBoxFromKey(sboxKeyResult.key);
-            updateSBoxUI(sbox);
-            validateSBox(sbox);
+            roundKeysInfo.innerHTML = info;
+            roundKeysInfo.style.display = 'block';
         }
         
         // Обработчики событий
-        checkMatrixBtn.addEventListener('click', () => {
-            const matrix = getMatrix();
-            if (isMatrixInvertible(matrix)) {
-                matrixStatus.textContent = "Матрица обратима по модулю 26";
-                matrixStatus.style.color = "green";
-            } else {
-                matrixStatus.textContent = "Матрица необратима по модулю 26";
-                matrixStatus.style.color = "red";
-            }
-        });
-        
-        generateKeysBtn.addEventListener('click', generateKeys);
+        showRoundsBtn.addEventListener('click', showRoundKeys);
         encryptBtn.addEventListener('click', encrypt);
         decryptBtn.addEventListener('click', decrypt);
         
         // Инициализация при загрузке
         document.addEventListener('DOMContentLoaded', () => {
-            generateKeys();
+            const keyResult = validateKey(mainKeyInput.value);
+            if (keyResult.valid) {
+                mainKeyStatus.textContent = "Ключ валиден";
+                mainKeyStatus.className = 'status valid';
+            }
         });
     </script>
 </body>
