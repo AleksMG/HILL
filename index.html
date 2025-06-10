@@ -1,106 +1,171 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChaCha20 с пользовательским алфавитом</title>
+    <title>ChaCha20 Cipher</title>
     <style>
+        :root {
+            --bg-color: #f5f5f7;
+            --card-color: #ffffff;
+            --text-color: #1d1d1f;
+            --primary-color: #0071e3;
+            --border-color: #d2d2d7;
+            --error-color: #ff3b30;
+        }
+        
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            max-width: 620px;
             margin: 0 auto;
             padding: 20px;
+            line-height: 1.5;
         }
-        textarea, input, button {
+        
+        h1 {
+            font-weight: 600;
+            font-size: 28px;
+            margin-bottom: 24px;
+        }
+        
+        .card {
+            background-color: var(--card-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .input-group {
+            margin-bottom: 16px;
+        }
+        
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #86868b;
+        }
+        
+        input, textarea {
             width: 100%;
-            margin-bottom: 10px;
-            padding: 8px;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 15px;
+            background-color: var(--card-color);
         }
+        
+        textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        
         button {
-            background-color: #4CAF50;
+            background-color: var(--primary-color);
             color: white;
             border: none;
+            border-radius: 980px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
             cursor: pointer;
-            padding: 10px;
+            transition: all 0.2s;
         }
+        
         button:hover {
-            background-color: #45a049;
+            background-color: #0062c3;
         }
-        .container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+        
+        button:active {
+            transform: scale(0.98);
         }
+        
         .result {
-            padding: 10px;
-            border: 1px solid #ddd;
-            min-height: 50px;
+            padding: 12px;
+            border-radius: 8px;
+            background-color: #f5f5f7;
+            margin-top: 16px;
+            font-size: 15px;
+        }
+        
+        .error {
+            color: var(--error-color);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
         }
     </style>
 </head>
 <body>
-    <h1>ChaCha20 с пользовательским алфавитом</h1>
+    <h1>ChaCha20 Cipher</h1>
     
-    <div class="container">
-        <div>
-            <label for="alphabet">Алфавит (символы без пробелов):</label>
-            <input type="text" id="alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" placeholder="Введите алфавит (например, ABCDEFGHIJKLMNOPQRSTUVWXYZ)">
+    <div class="card">
+        <div class="input-group">
+            <label for="alphabet">Alphabet (no spaces):</label>
+            <input type="text" id="alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" placeholder="Enter alphabet (e.g. ABCDEFGHIJKLMNOPQRSTUVWXYZ)">
         </div>
         
-        <div>
-            <label for="key">Ключ (любой текст):</label>
-            <input type="text" id="key" value="секретныйключ" placeholder="Введите ключ">
+        <div class="input-group">
+            <label for="key">Key (any text):</label>
+            <input type="text" id="key" value="secretkey" placeholder="Enter key">
         </div>
         
-        <div>
-            <label for="nonce">Nonce (уникальное значение):</label>
-            <input type="text" id="nonce" value="уникальныйнонс" placeholder="Введите nonce">
+        <div class="input-group">
+            <label for="nonce">Nonce (unique value):</label>
+            <input type="text" id="nonce" value="uniquenonce" placeholder="Enter nonce">
         </div>
         
-        <div>
-            <label for="counter">Счетчик (число):</label>
+        <div class="input-group">
+            <label for="counter">Counter (number):</label>
             <input type="number" id="counter" value="1" min="0">
         </div>
-        
-        <div>
-            <label for="message">Сообщение для шифрования (только символы из алфавита):</label>
-            <textarea id="message" rows="4" placeholder="Введите сообщение для шифрования"></textarea>
+    </div>
+    
+    <div class="card">
+        <div class="input-group">
+            <label for="message">Message to encrypt (alphabet characters only):</label>
+            <textarea id="message" placeholder="Enter message to encrypt"></textarea>
         </div>
         
-        <button onclick="encrypt()">Зашифровать</button>
-        
-        <div>
-            <label for="ciphertext">Шифротекст:</label>
-            <textarea id="ciphertext" rows="4" placeholder="Шифротекст появится здесь"></textarea>
+        <div class="button-group">
+            <button onclick="encrypt()">Encrypt</button>
+            <button onclick="decrypt()">Decrypt</button>
         </div>
         
-        <button onclick="decrypt()">Расшифровать</button>
-        
-        <div>
-            <label>Результат:</label>
-            <div id="result" class="result"></div>
+        <div class="input-group">
+            <label for="ciphertext">Ciphertext:</label>
+            <textarea id="ciphertext" placeholder="Ciphertext will appear here"></textarea>
         </div>
+        
+        <div id="result" class="result"></div>
     </div>
 
     <script>
-        // Функции для работы с ChaCha20
+        // ChaCha20 implementation
         function quarterRound(state, a, b, c, d) {
-            state[a] += state[b]; state[d] = rotateLeft(state[d] ^ state[a], 16);
-            state[c] += state[d]; state[b] = rotateLeft(state[b] ^ state[c], 12);
-            state[a] += state[b]; state[d] = rotateLeft(state[d] ^ state[a], 8);
-            state[c] += state[d]; state[b] = rotateLeft(state[b] ^ state[c], 7);
+            state[a] = (state[a] + state[b]) >>> 0; state[d] = rotateLeft(state[d] ^ state[a], 16);
+            state[c] = (state[c] + state[d]) >>> 0; state[b] = rotateLeft(state[b] ^ state[c], 12);
+            state[a] = (state[a] + state[b]) >>> 0; state[d] = rotateLeft(state[d] ^ state[a], 8);
+            state[c] = (state[c] + state[d]) >>> 0; state[b] = rotateLeft(state[b] ^ state[c], 7);
         }
 
         function rotateLeft(value, amount) {
-            return (value << amount) | (value >>> (32 - amount));
+            return ((value << amount) | (value >>> (32 - amount))) >>> 0;
         }
 
         function chacha20Block(key, counter, nonce) {
-            // Константы
+            // Constants
             const constants = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
             
-            // Преобразуем ключ в массив 32-битных слов (дополняем до 32 байт)
-            const keyBytes = new TextEncoder().encode(key.padEnd(32, '\0').slice(0, 32));
+            // Convert key to 32 bytes (256 bits)
+            const keyBytes = stringToBytes(key.padEnd(32, '\0').slice(0, 32));
             const keyWords = [];
             for (let i = 0; i < 8; i++) {
                 keyWords.push(
@@ -113,8 +178,8 @@
             
             const counterWords = [counter, 0];
             
-            // Преобразуем nonce в массив 32-битных слов (дополняем до 12 байт)
-            const nonceBytes = new TextEncoder().encode(nonce.padEnd(12, '\0').slice(0, 12));
+            // Convert nonce to 12 bytes (96 bits)
+            const nonceBytes = stringToBytes(nonce.padEnd(12, '\0').slice(0, 12));
             const nonceWords = [];
             for (let i = 0; i < 3; i++) {
                 nonceWords.push(
@@ -125,7 +190,7 @@
                 );
             }
             
-            // Инициализация состояния
+            // Initialize state
             let state = [
                 constants[0], constants[1], constants[2], constants[3],
                 keyWords[0], keyWords[1], keyWords[2], keyWords[3],
@@ -133,30 +198,30 @@
                 counterWords[0], counterWords[1], nonceWords[0], nonceWords[1], nonceWords[2]
             ];
             
-            // Сохраняем исходное состояние
+            // Save initial state
             const initialState = state.slice();
             
-            // 10 двойных раундов (20 раундов всего)
+            // 20 rounds (10 double rounds)
             for (let i = 0; i < 10; i++) {
-                // Колонные раунды
+                // Column rounds
                 quarterRound(state, 0, 4, 8, 12);
                 quarterRound(state, 1, 5, 9, 13);
                 quarterRound(state, 2, 6, 10, 14);
                 quarterRound(state, 3, 7, 11, 15);
                 
-                // Диагональные раунды
+                // Diagonal rounds
                 quarterRound(state, 0, 5, 10, 15);
                 quarterRound(state, 1, 6, 11, 12);
                 quarterRound(state, 2, 7, 8, 13);
                 quarterRound(state, 3, 4, 9, 14);
             }
             
-            // Складываем с исходным состоянием
+            // Add initial state
             for (let i = 0; i < 16; i++) {
-                state[i] += initialState[i];
+                state[i] = (state[i] + initialState[i]) >>> 0;
             }
             
-            // Преобразуем в байтовый массив
+            // Convert to byte array
             let output = new Uint8Array(64);
             for (let i = 0; i < 16; i++) {
                 output[i*4] = state[i] & 0xff;
@@ -183,23 +248,35 @@
             return output;
         }
 
-        // Функции для работы с алфавитом
+        // Helper functions
+        function stringToBytes(str) {
+            const bytes = new Uint8Array(str.length);
+            for (let i = 0; i < str.length; i++) {
+                bytes[i] = str.charCodeAt(i) & 0xff;
+            }
+            return bytes;
+        }
+
+        function bytesToString(bytes) {
+            let str = '';
+            for (let i = 0; i < bytes.length; i++) {
+                str += String.fromCharCode(bytes[i]);
+            }
+            return str;
+        }
+
         function textToBytes(text, alphabet) {
             const indices = [];
             for (let i = 0; i < text.length; i++) {
-                const index = alphabet.indexOf(text[i]);
+                const char = text[i].toUpperCase();
+                const index = alphabet.indexOf(char);
                 if (index === -1) {
-                    throw new Error(`Символ '${text[i]}' не найден в алфавите`);
+                    throw new Error(`Character '${char}' not found in alphabet`);
                 }
                 indices.push(index);
             }
             
-            // Преобразуем индексы в байты
-            const bytes = new Uint8Array(indices.length);
-            for (let i = 0; i < indices.length; i++) {
-                bytes[i] = indices[i];
-            }
-            return bytes;
+            return new Uint8Array(indices);
         }
 
         function bytesToText(bytes, alphabet) {
@@ -210,58 +287,59 @@
             return text;
         }
 
+        // Main functions
         function encrypt() {
             try {
                 const alphabet = document.getElementById('alphabet').value;
-                if (!alphabet) {
-                    throw new Error('Алфавит не может быть пустым');
-                }
+                if (!alphabet) throw new Error('Alphabet cannot be empty');
                 
                 const key = document.getElementById('key').value;
                 const nonce = document.getElementById('nonce').value;
                 const counter = parseInt(document.getElementById('counter').value);
                 const message = document.getElementById('message').value.toUpperCase();
                 
-                // Проверяем, что сообщение состоит только из символов алфавита
+                // Validate and convert message
                 const messageBytes = textToBytes(message, alphabet);
                 
-                // Шифруем
+                // Encrypt
                 const cipherBytes = chacha20(key, counter, nonce, messageBytes);
                 
-                // Преобразуем байты в текст алфавита
+                // Convert to alphabet characters
                 const ciphertext = bytesToText(cipherBytes, alphabet);
                 
                 document.getElementById('ciphertext').value = ciphertext;
-                document.getElementById('result').textContent = 'Сообщение успешно зашифровано!';
+                document.getElementById('result').textContent = 'Message encrypted successfully!';
+                document.getElementById('result').className = 'result';
             } catch (error) {
-                document.getElementById('result').textContent = 'Ошибка: ' + error.message;
+                document.getElementById('result').textContent = 'Error: ' + error.message;
+                document.getElementById('result').className = 'result error';
             }
         }
 
         function decrypt() {
             try {
                 const alphabet = document.getElementById('alphabet').value;
-                if (!alphabet) {
-                    throw new Error('Алфавит не может быть пустым');
-                }
+                if (!alphabet) throw new Error('Alphabet cannot be empty');
                 
                 const key = document.getElementById('key').value;
                 const nonce = document.getElementById('nonce').value;
                 const counter = parseInt(document.getElementById('counter').value);
                 const ciphertext = document.getElementById('ciphertext').value.toUpperCase();
                 
-                // Преобразуем шифротекст в байты
+                // Validate and convert ciphertext
                 const cipherBytes = textToBytes(ciphertext, alphabet);
                 
-                // Дешифруем (процесс такой же как шифрование)
+                // Decrypt (same operation as encrypt)
                 const messageBytes = chacha20(key, counter, nonce, cipherBytes);
                 
-                // Преобразуем байты в текст алфавита
+                // Convert to alphabet characters
                 const message = bytesToText(messageBytes, alphabet);
                 
-                document.getElementById('result').textContent = 'Расшифрованное сообщение: ' + message;
+                document.getElementById('result').textContent = 'Decrypted message: ' + message;
+                document.getElementById('result').className = 'result';
             } catch (error) {
-                document.getElementById('result').textContent = 'Ошибка: ' + error.message;
+                document.getElementById('result').textContent = 'Error: ' + error.message;
+                document.getElementById('result').className = 'result error';
             }
         }
     </script>
