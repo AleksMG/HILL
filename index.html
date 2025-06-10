@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChaCha20 Cipher</title>
+    <title>ChaCha20 Cipher Tool</title>
     <style>
         :root {
             --bg-color: #f5f5f7;
@@ -12,13 +12,14 @@
             --primary-color: #0071e3;
             --border-color: #d2d2d7;
             --error-color: #ff3b30;
+            --success-color: #34c759;
         }
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
-            max-width: 620px;
+            max-width: 680px;
             margin: 0 auto;
             padding: 20px;
             line-height: 1.5;
@@ -28,14 +29,15 @@
             font-weight: 600;
             font-size: 28px;
             margin-bottom: 24px;
+            text-align: center;
         }
         
         .card {
             background-color: var(--card-color);
             border-radius: 12px;
-            padding: 20px;
+            padding: 24px;
             margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         
         .input-group {
@@ -46,34 +48,37 @@
             display: block;
             font-size: 13px;
             font-weight: 500;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
             color: #86868b;
         }
         
-        input, textarea {
+        input, textarea, select {
             width: 100%;
-            padding: 8px 12px;
+            padding: 10px 14px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             font-size: 15px;
             background-color: var(--card-color);
+            box-sizing: border-box;
         }
         
         textarea {
-            min-height: 80px;
+            min-height: 100px;
             resize: vertical;
+            font-family: monospace;
         }
         
         button {
             background-color: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 980px;
-            padding: 8px 16px;
-            font-size: 14px;
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-size: 15px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
+            width: 100%;
         }
         
         button:hover {
@@ -85,46 +90,85 @@
         }
         
         .result {
-            padding: 12px;
+            padding: 14px;
             border-radius: 8px;
-            background-color: #f5f5f7;
             margin-top: 16px;
             font-size: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .success {
+            background-color: rgba(52, 199, 89, 0.1);
+            color: var(--success-color);
+            border: 1px solid rgba(52, 199, 89, 0.3);
         }
         
         .error {
+            background-color: rgba(255, 59, 48, 0.1);
             color: var(--error-color);
+            border: 1px solid rgba(255, 59, 48, 0.3);
         }
         
         .button-group {
             display: flex;
-            gap: 10px;
-            margin-top: 16px;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .status {
+            font-size: 13px;
+            margin-top: 8px;
+            min-height: 18px;
+        }
+        
+        .debug {
+            font-size: 12px;
+            color: #86868b;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .debug-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .debug-content {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
     </style>
 </head>
 <body>
-    <h1>ChaCha20 Cipher</h1>
+    <h1>ChaCha20 Cipher Tool</h1>
     
     <div class="card">
         <div class="input-group">
-            <label for="alphabet">Alphabet (no spaces):</label>
-            <input type="text" id="alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" placeholder="Enter alphabet (e.g. ABCDEFGHIJKLMNOPQRSTUVWXYZ)">
+            <label for="alphabet">Alphabet (required):</label>
+            <input type="text" id="alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" placeholder="Enter characters (e.g. ABCDEFGHIJKLMNOPQRSTUVWXYZ)">
+            <div id="alphabet-status" class="status"></div>
         </div>
         
         <div class="input-group">
-            <label for="key">Key (any text):</label>
-            <input type="text" id="key" value="secretkey" placeholder="Enter key">
+            <label for="key">Key (exactly 32 characters):</label>
+            <input type="text" id="key" value="thisisa32characterlongkeysecret!!" placeholder="Enter 32-character key">
+            <div id="key-status" class="status"></div>
         </div>
         
         <div class="input-group">
-            <label for="nonce">Nonce (unique value):</label>
-            <input type="text" id="nonce" value="uniquenonce" placeholder="Enter nonce">
+            <label for="nonce">Nonce (exactly 12 characters):</label>
+            <input type="text" id="nonce" value="unique12nonce" placeholder="Enter 12-character nonce">
+            <div id="nonce-status" class="status"></div>
         </div>
         
         <div class="input-group">
-            <label for="counter">Counter (number):</label>
-            <input type="number" id="counter" value="1" min="0">
+            <label for="counter">Counter (number 0-2^32):</label>
+            <input type="number" id="counter" value="1" min="0" max="4294967295">
+            <div id="counter-status" class="status"></div>
         </div>
     </div>
     
@@ -132,6 +176,7 @@
         <div class="input-group">
             <label for="message">Message to encrypt (alphabet characters only):</label>
             <textarea id="message" placeholder="Enter message to encrypt"></textarea>
+            <div id="message-status" class="status"></div>
         </div>
         
         <div class="button-group">
@@ -142,64 +187,197 @@
         <div class="input-group">
             <label for="ciphertext">Ciphertext:</label>
             <textarea id="ciphertext" placeholder="Ciphertext will appear here"></textarea>
+            <div id="ciphertext-status" class="status"></div>
         </div>
         
         <div id="result" class="result"></div>
+        
+        <div class="debug">
+            <div class="debug-title">Debug Info:</div>
+            <div id="debug-info" class="debug-content"></div>
+        </div>
     </div>
 
     <script>
-        // ChaCha20 implementation
-        function quarterRound(state, a, b, c, d) {
-            state[a] = (state[a] + state[b]) >>> 0; state[d] = rotateLeft(state[d] ^ state[a], 16);
-            state[c] = (state[c] + state[d]) >>> 0; state[b] = rotateLeft(state[b] ^ state[c], 12);
-            state[a] = (state[a] + state[b]) >>> 0; state[d] = rotateLeft(state[d] ^ state[a], 8);
-            state[c] = (state[c] + state[d]) >>> 0; state[b] = rotateLeft(state[b] ^ state[c], 7);
+        // Constants
+        const CHACHA20_CONSTANTS = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
+        const KEY_LENGTH = 32; // 256 bits
+        const NONCE_LENGTH = 12; // 96 bits
+        
+        // DOM elements
+        const elements = {
+            alphabet: document.getElementById('alphabet'),
+            key: document.getElementById('key'),
+            nonce: document.getElementById('nonce'),
+            counter: document.getElementById('counter'),
+            message: document.getElementById('message'),
+            ciphertext: document.getElementById('ciphertext'),
+            result: document.getElementById('result'),
+            debug: document.getElementById('debug-info'),
+            status: {
+                alphabet: document.getElementById('alphabet-status'),
+                key: document.getElementById('key-status'),
+                nonce: document.getElementById('nonce-status'),
+                counter: document.getElementById('counter-status'),
+                message: document.getElementById('message-status'),
+                ciphertext: document.getElementById('ciphertext-status')
+            }
+        };
+        
+        // Validate inputs in real-time
+        elements.alphabet.addEventListener('input', validateAlphabet);
+        elements.key.addEventListener('input', validateKey);
+        elements.nonce.addEventListener('input', validateNonce);
+        elements.counter.addEventListener('input', validateCounter);
+        elements.message.addEventListener('input', validateMessage);
+        elements.ciphertext.addEventListener('input', validateCiphertext);
+        
+        // Validation functions
+        function validateAlphabet() {
+            const value = elements.alphabet.value;
+            if (!value) {
+                setStatus('alphabet', 'Alphabet is required', 'error');
+                return false;
+            }
+            
+            // Check for duplicates
+            const uniqueChars = [...new Set(value.split(''))];
+            if (uniqueChars.length !== value.length) {
+                setStatus('alphabet', 'Alphabet contains duplicate characters', 'error');
+                return false;
+            }
+            
+            setStatus('alphabet', `${value.length} unique characters`, 'success');
+            return true;
         }
-
+        
+        function validateKey() {
+            const value = elements.key.value;
+            if (value.length !== KEY_LENGTH) {
+                setStatus('key', `Key must be exactly ${KEY_LENGTH} characters`, 'error');
+                return false;
+            }
+            
+            setStatus('key', 'Valid key length', 'success');
+            return true;
+        }
+        
+        function validateNonce() {
+            const value = elements.nonce.value;
+            if (value.length !== NONCE_LENGTH) {
+                setStatus('nonce', `Nonce must be exactly ${NONCE_LENGTH} characters`, 'error');
+                return false;
+            }
+            
+            setStatus('nonce', 'Valid nonce length', 'success');
+            return true;
+        }
+        
+        function validateCounter() {
+            const value = parseInt(elements.counter.value);
+            if (isNaN(value) || value < 0 || value > 4294967295) {
+                setStatus('counter', 'Counter must be between 0 and 4294967295', 'error');
+                return false;
+            }
+            
+            setStatus('counter', 'Valid counter', 'success');
+            return true;
+        }
+        
+        function validateMessage() {
+            const value = elements.message.value.toUpperCase();
+            const alphabet = elements.alphabet.value;
+            
+            if (!alphabet) {
+                setStatus('message', 'Please set alphabet first', 'error');
+                return false;
+            }
+            
+            for (let i = 0; i < value.length; i++) {
+                if (!alphabet.includes(value[i])) {
+                    setStatus('message', `Character '${value[i]}' not in alphabet`, 'error');
+                    return false;
+                }
+            }
+            
+            setStatus('message', value ? `${value.length} valid characters` : '', 'success');
+            return true;
+        }
+        
+        function validateCiphertext() {
+            const value = elements.ciphertext.value.toUpperCase();
+            const alphabet = elements.alphabet.value;
+            
+            if (!alphabet) {
+                setStatus('ciphertext', 'Please set alphabet first', 'error');
+                return false;
+            }
+            
+            for (let i = 0; i < value.length; i++) {
+                if (!alphabet.includes(value[i])) {
+                    setStatus('ciphertext', `Character '${value[i]}' not in alphabet`, 'error');
+                    return false;
+                }
+            }
+            
+            setStatus('ciphertext', value ? `${value.length} valid characters` : '', 'success');
+            return true;
+        }
+        
+        function setStatus(field, message, type) {
+            elements.status[field].textContent = message;
+            elements.status[field].className = `status ${type}`;
+        }
+        
+        // Core ChaCha20 functions
+        function quarterRound(state, a, b, c, d) {
+            state[a] = (state[a] + state[b]) >>> 0;
+            state[d] = rotateLeft(state[d] ^ state[a], 16);
+            state[c] = (state[c] + state[d]) >>> 0;
+            state[b] = rotateLeft(state[b] ^ state[c], 12);
+            state[a] = (state[a] + state[b]) >>> 0;
+            state[d] = rotateLeft(state[d] ^ state[a], 8);
+            state[c] = (state[c] + state[d]) >>> 0;
+            state[b] = rotateLeft(state[b] ^ state[c], 7);
+        }
+        
         function rotateLeft(value, amount) {
             return ((value << amount) | (value >>> (32 - amount))) >>> 0;
         }
-
+        
         function chacha20Block(key, counter, nonce) {
-            // Constants
-            const constants = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
-            
-            // Convert key to 32 bytes (256 bits)
-            const keyBytes = stringToBytes(key.padEnd(32, '\0').slice(0, 32));
+            // Convert key to 32-bit words (8 words)
             const keyWords = [];
             for (let i = 0; i < 8; i++) {
                 keyWords.push(
-                    (keyBytes[i*4] << 0) |
-                    (keyBytes[i*4+1] << 8) |
-                    (keyBytes[i*4+2] << 16) |
-                    (keyBytes[i*4+3] << 24)
+                    (key.charCodeAt(i*4) << 0) |
+                    (key.charCodeAt(i*4+1) << 8) |
+                    (key.charCodeAt(i*4+2) << 16) |
+                    (key.charCodeAt(i*4+3) << 24)
                 );
             }
             
-            const counterWords = [counter, 0];
-            
-            // Convert nonce to 12 bytes (96 bits)
-            const nonceBytes = stringToBytes(nonce.padEnd(12, '\0').slice(0, 12));
+            // Convert nonce to 32-bit words (3 words)
             const nonceWords = [];
             for (let i = 0; i < 3; i++) {
                 nonceWords.push(
-                    (nonceBytes[i*4] << 0) |
-                    (nonceBytes[i*4+1] << 8) |
-                    (nonceBytes[i*4+2] << 16) |
-                    (nonceBytes[i*4+3] << 24)
+                    (nonce.charCodeAt(i*4) << 0) |
+                    (nonce.charCodeAt(i*4+1) << 8) |
+                    (nonce.charCodeAt(i*4+2) << 16) |
+                    (nonce.charCodeAt(i*4+3) << 24)
                 );
             }
             
             // Initialize state
             let state = [
-                constants[0], constants[1], constants[2], constants[3],
-                keyWords[0], keyWords[1], keyWords[2], keyWords[3],
-                keyWords[4], keyWords[5], keyWords[6], keyWords[7],
-                counterWords[0], counterWords[1], nonceWords[0], nonceWords[1], nonceWords[2]
+                ...CHACHA20_CONSTANTS,
+                ...keyWords,
+                counter, 0, // Counter (64-bit, split into two 32-bit words)
+                ...nonceWords
             ];
             
             // Save initial state
-            const initialState = state.slice();
+            const initialState = [...state];
             
             // 20 rounds (10 double rounds)
             for (let i = 0; i < 10; i++) {
@@ -222,7 +400,7 @@
             }
             
             // Convert to byte array
-            let output = new Uint8Array(64);
+            const output = new Uint8Array(64);
             for (let i = 0; i < 16; i++) {
                 output[i*4] = state[i] & 0xff;
                 output[i*4+1] = (state[i] >>> 8) & 0xff;
@@ -232,114 +410,151 @@
             
             return output;
         }
-
-        function chacha20(key, counter, nonce, data) {
-            let output = new Uint8Array(data.length);
+        
+        function chacha20(key, counter, nonce, message) {
+            const messageBytes = new TextEncoder().encode(message);
+            const output = new Uint8Array(messageBytes.length);
             
-            for (let i = 0; i < data.length; i += 64) {
+            for (let i = 0; i < messageBytes.length; i += 64) {
                 const keyStream = chacha20Block(key, counter + Math.floor(i / 64), nonce);
-                const blockLength = Math.min(64, data.length - i);
+                const blockLength = Math.min(64, messageBytes.length - i);
                 
                 for (let j = 0; j < blockLength; j++) {
-                    output[i + j] = data[i + j] ^ keyStream[j];
+                    output[i + j] = messageBytes[i + j] ^ keyStream[j];
                 }
             }
             
             return output;
         }
-
-        // Helper functions
-        function stringToBytes(str) {
-            const bytes = new Uint8Array(str.length);
-            for (let i = 0; i < str.length; i++) {
-                bytes[i] = str.charCodeAt(i) & 0xff;
-            }
-            return bytes;
-        }
-
-        function bytesToString(bytes) {
-            let str = '';
-            for (let i = 0; i < bytes.length; i++) {
-                str += String.fromCharCode(bytes[i]);
-            }
-            return str;
-        }
-
-        function textToBytes(text, alphabet) {
-            const indices = [];
+        
+        // Alphabet conversion functions
+        function textToIndices(text, alphabet) {
+            const indices = new Uint8Array(text.length);
             for (let i = 0; i < text.length; i++) {
-                const char = text[i].toUpperCase();
-                const index = alphabet.indexOf(char);
+                const index = alphabet.indexOf(text[i]);
                 if (index === -1) {
-                    throw new Error(`Character '${char}' not found in alphabet`);
+                    throw new Error(`Character '${text[i]}' not found in alphabet`);
                 }
-                indices.push(index);
+                indices[i] = index;
             }
-            
-            return new Uint8Array(indices);
+            return indices;
         }
-
-        function bytesToText(bytes, alphabet) {
+        
+        function indicesToText(indices, alphabet) {
             let text = '';
-            for (let i = 0; i < bytes.length; i++) {
-                text += alphabet[bytes[i] % alphabet.length];
+            for (let i = 0; i < indices.length; i++) {
+                text += alphabet[indices[i] % alphabet.length];
             }
             return text;
         }
-
+        
         // Main functions
         function encrypt() {
             try {
-                const alphabet = document.getElementById('alphabet').value;
-                if (!alphabet) throw new Error('Alphabet cannot be empty');
+                // Validate all inputs
+                if (!validateAlphabet() || !validateKey() || !validateNonce() || !validateCounter() || !validateMessage()) {
+                    throw new Error('Please fix all validation errors');
+                }
                 
-                const key = document.getElementById('key').value;
-                const nonce = document.getElementById('nonce').value;
-                const counter = parseInt(document.getElementById('counter').value);
-                const message = document.getElementById('message').value.toUpperCase();
+                const alphabet = elements.alphabet.value;
+                const key = elements.key.value;
+                const nonce = elements.nonce.value;
+                const counter = parseInt(elements.counter.value);
+                const message = elements.message.value.toUpperCase();
                 
-                // Validate and convert message
-                const messageBytes = textToBytes(message, alphabet);
+                // Convert message to alphabet indices
+                const messageIndices = textToIndices(message, alphabet);
+                
+                // Convert indices to bytes for encryption
+                const messageBytes = new Uint8Array(messageIndices);
                 
                 // Encrypt
-                const cipherBytes = chacha20(key, counter, nonce, messageBytes);
+                const cipherBytes = chacha20(key, counter, nonce, new TextDecoder().decode(messageBytes));
                 
-                // Convert to alphabet characters
-                const ciphertext = bytesToText(cipherBytes, alphabet);
+                // Convert encrypted bytes to alphabet indices
+                const cipherIndices = new Uint8Array(cipherBytes.length);
+                for (let i = 0; i < cipherBytes.length; i++) {
+                    cipherIndices[i] = cipherBytes[i] % alphabet.length;
+                }
                 
-                document.getElementById('ciphertext').value = ciphertext;
-                document.getElementById('result').textContent = 'Message encrypted successfully!';
-                document.getElementById('result').className = 'result';
+                // Convert indices to ciphertext
+                const ciphertext = indicesToText(cipherIndices, alphabet);
+                
+                // Update UI
+                elements.ciphertext.value = ciphertext;
+                elements.result.textContent = ciphertext;
+                elements.result.className = 'result success';
+                
+                // Debug info
+                elements.debug.textContent = [
+                    `Alphabet: ${alphabet}`,
+                    `Key: ${key}`,
+                    `Nonce: ${nonce}`,
+                    `Counter: ${counter}`,
+                    `Message: ${message}`,
+                    `Message Indices: ${Array.from(messageIndices)}`,
+                    `Cipher Indices: ${Array.from(cipherIndices)}`,
+                    `Ciphertext: ${ciphertext}`
+                ].join('\n');
+                
             } catch (error) {
-                document.getElementById('result').textContent = 'Error: ' + error.message;
-                document.getElementById('result').className = 'result error';
+                elements.result.textContent = `Error: ${error.message}`;
+                elements.result.className = 'result error';
+                elements.debug.textContent = error.stack;
             }
         }
-
+        
         function decrypt() {
             try {
-                const alphabet = document.getElementById('alphabet').value;
-                if (!alphabet) throw new Error('Alphabet cannot be empty');
+                // Validate all inputs
+                if (!validateAlphabet() || !validateKey() || !validateNonce() || !validateCounter() || !validateCiphertext()) {
+                    throw new Error('Please fix all validation errors');
+                }
                 
-                const key = document.getElementById('key').value;
-                const nonce = document.getElementById('nonce').value;
-                const counter = parseInt(document.getElementById('counter').value);
-                const ciphertext = document.getElementById('ciphertext').value.toUpperCase();
+                const alphabet = elements.alphabet.value;
+                const key = elements.key.value;
+                const nonce = elements.nonce.value;
+                const counter = parseInt(elements.counter.value);
+                const ciphertext = elements.ciphertext.value.toUpperCase();
                 
-                // Validate and convert ciphertext
-                const cipherBytes = textToBytes(ciphertext, alphabet);
+                // Convert ciphertext to alphabet indices
+                const cipherIndices = textToIndices(ciphertext, alphabet);
                 
-                // Decrypt (same operation as encrypt)
-                const messageBytes = chacha20(key, counter, nonce, cipherBytes);
+                // Convert indices to bytes for decryption
+                const cipherBytes = new Uint8Array(cipherIndices);
                 
-                // Convert to alphabet characters
-                const message = bytesToText(messageBytes, alphabet);
+                // Decrypt (same operation as encryption)
+                const messageBytes = chacha20(key, counter, nonce, new TextDecoder().decode(cipherBytes));
                 
-                document.getElementById('result').textContent = 'Decrypted message: ' + message;
-                document.getElementById('result').className = 'result';
+                // Convert decrypted bytes to alphabet indices
+                const messageIndices = new Uint8Array(messageBytes.length);
+                for (let i = 0; i < messageBytes.length; i++) {
+                    messageIndices[i] = messageBytes[i] % alphabet.length;
+                }
+                
+                // Convert indices to plaintext
+                const plaintext = indicesToText(messageIndices, alphabet);
+                
+                // Update UI
+                elements.result.textContent = plaintext;
+                elements.result.className = 'result success';
+                
+                // Debug info
+                elements.debug.textContent = [
+                    `Alphabet: ${alphabet}`,
+                    `Key: ${key}`,
+                    `Nonce: ${nonce}`,
+                    `Counter: ${counter}`,
+                    `Ciphertext: ${ciphertext}`,
+                    `Cipher Indices: ${Array.from(cipherIndices)}`,
+                    `Message Indices: ${Array.from(messageIndices)}`,
+                    `Plaintext: ${plaintext}`
+                ].join('\n');
+                
             } catch (error) {
-                document.getElementById('result').textContent = 'Error: ' + error.message;
-                document.getElementById('result').className = 'result error';
+                elements.result.textContent = `Error: ${error.message}`;
+                elements.result.className = 'result error';
+                elements.debug.textContent = error.stack;
             }
         }
     </script>
