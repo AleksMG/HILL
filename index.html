@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChaCha20 Cipher Tool</title>
+    <title>Secure ChaCha20 Implementation</title>
     <style>
         :root {
             --bg-color: #f5f5f7;
@@ -144,29 +144,29 @@
     </style>
 </head>
 <body>
-    <h1>ChaCha20 Cipher Tool</h1>
+    <h1>Secure ChaCha20 Implementation</h1>
     
     <div class="card">
         <div class="input-group">
-            <label for="alphabet">Alphabet (required):</label>
+            <label for="alphabet">Alphabet (required, no duplicates):</label>
             <input type="text" id="alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" placeholder="Enter characters (e.g. ABCDEFGHIJKLMNOPQRSTUVWXYZ)">
             <div id="alphabet-status" class="status"></div>
         </div>
         
         <div class="input-group">
-            <label for="key">Key (exactly 32 characters):</label>
+            <label for="key">Key (exactly 32 ASCII characters):</label>
             <input type="text" id="key" value="thisisa32characterlongkeysecret!!" placeholder="Enter 32-character key">
             <div id="key-status" class="status"></div>
         </div>
         
         <div class="input-group">
-            <label for="nonce">Nonce (exactly 12 characters):</label>
+            <label for="nonce">Nonce (exactly 12 ASCII characters):</label>
             <input type="text" id="nonce" value="unique12nonce" placeholder="Enter 12-character nonce">
             <div id="nonce-status" class="status"></div>
         </div>
         
         <div class="input-group">
-            <label for="counter">Counter (number 0-2^32):</label>
+            <label for="counter">Counter (number 0-2^32-1):</label>
             <input type="number" id="counter" value="1" min="0" max="4294967295">
             <div id="counter-status" class="status"></div>
         </div>
@@ -175,7 +175,7 @@
     <div class="card">
         <div class="input-group">
             <label for="message">Message to encrypt (alphabet characters only):</label>
-            <textarea id="message" placeholder="Enter message to encrypt"></textarea>
+            <textarea id="message" placeholder="Enter message to encrypt">HELLO</textarea>
             <div id="message-status" class="status"></div>
         </div>
         
@@ -200,9 +200,10 @@
 
     <script>
         // Constants
-        const CHACHA20_CONSTANTS = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
+        const CHACHA20_CONSTANTS = new Uint32Array([0x61707865, 0x3320646e, 0x79622d32, 0x6b206574]);
         const KEY_LENGTH = 32; // 256 bits
         const NONCE_LENGTH = 12; // 96 bits
+        const BLOCK_SIZE = 64; // 64 bytes
         
         // DOM elements
         const elements = {
@@ -258,7 +259,15 @@
                 return false;
             }
             
-            setStatus('key', 'Valid key length', 'success');
+            // Check all characters are ASCII
+            for (let i = 0; i < value.length; i++) {
+                if (value.charCodeAt(i) > 127) {
+                    setStatus('key', 'Key must contain only ASCII characters', 'error');
+                    return false;
+                }
+            }
+            
+            setStatus('key', 'Valid key length and format', 'success');
             return true;
         }
         
@@ -269,7 +278,15 @@
                 return false;
             }
             
-            setStatus('nonce', 'Valid nonce length', 'success');
+            // Check all characters are ASCII
+            for (let i = 0; i < value.length; i++) {
+                if (value.charCodeAt(i) > 127) {
+                    setStatus('nonce', 'Nonce must contain only ASCII characters', 'error');
+                    return false;
+                }
+            }
+            
+            setStatus('nonce', 'Valid nonce length and format', 'success');
             return true;
         }
         
@@ -280,7 +297,7 @@
                 return false;
             }
             
-            setStatus('counter', 'Valid counter', 'success');
+            setStatus('counter', 'Valid counter value', 'success');
             return true;
         }
         
@@ -331,6 +348,7 @@
         
         // Core ChaCha20 functions
         function quarterRound(state, a, b, c, d) {
+            // Correct implementation with unsigned 32-bit operations
             state[a] = (state[a] + state[b]) >>> 0;
             state[d] = rotateLeft(state[d] ^ state[a], 16);
             state[c] = (state[c] + state[d]) >>> 0;
@@ -347,37 +365,45 @@
         
         function chacha20Block(key, counter, nonce) {
             // Convert key to 32-bit words (8 words)
-            const keyWords = [];
+            const keyWords = new Uint32Array(8);
             for (let i = 0; i < 8; i++) {
-                keyWords.push(
-                    (key.charCodeAt(i*4) << 0) |
-                    (key.charCodeAt(i*4+1) << 8) |
-                    (key.charCodeAt(i*4+2) << 16) |
-                    (key.charCodeAt(i*4+3) << 24)
-                );
+                keyWords[i] = (
+                    key.charCodeAt(i*4) |
+                    (key.charCodeAt(i*4+1) << 8 |
+                    (key.charCodeAt(i*4+2) << 16 |
+                    (key.charCodeAt(i*4+3) << 24
+                ) >>> 0;
             }
             
             // Convert nonce to 32-bit words (3 words)
-            const nonceWords = [];
+            const nonceWords = new Uint32Array(3);
             for (let i = 0; i < 3; i++) {
-                nonceWords.push(
-                    (nonce.charCodeAt(i*4) << 0) |
+                nonceWords[i] = (
+                    nonce.charCodeAt(i*4) |
                     (nonce.charCodeAt(i*4+1) << 8) |
                     (nonce.charCodeAt(i*4+2) << 16) |
                     (nonce.charCodeAt(i*4+3) << 24)
-                );
+                ) >>> 0;
             }
             
             // Initialize state
-            let state = [
-                ...CHACHA20_CONSTANTS,
-                ...keyWords,
-                counter, 0, // Counter (64-bit, split into two 32-bit words)
-                ...nonceWords
-            ];
+            const state = new Uint32Array(16);
+            
+            // Set constants
+            state.set(CHACHA20_CONSTANTS, 0);
+            
+            // Set key
+            state.set(keyWords, 4);
+            
+            // Set counter (64-bit as two 32-bit words)
+            state[12] = counter & 0xFFFFFFFF;
+            state[13] = Math.floor(counter / 0x100000000);
+            
+            // Set nonce
+            state.set(nonceWords, 14);
             
             // Save initial state
-            const initialState = [...state];
+            const initialState = new Uint32Array(state);
             
             // 20 rounds (10 double rounds)
             for (let i = 0; i < 10; i++) {
@@ -399,32 +425,32 @@
                 state[i] = (state[i] + initialState[i]) >>> 0;
             }
             
-            // Convert to byte array
-            const output = new Uint8Array(64);
+            // Convert to byte array (little-endian)
+            const output = new Uint8Array(BLOCK_SIZE);
             for (let i = 0; i < 16; i++) {
-                output[i*4] = state[i] & 0xff;
-                output[i*4+1] = (state[i] >>> 8) & 0xff;
-                output[i*4+2] = (state[i] >>> 16) & 0xff;
-                output[i*4+3] = (state[i] >>> 24) & 0xff;
+                output[i*4] = state[i] & 0xFF;
+                output[i*4+1] = (state[i] >>> 8) & 0xFF;
+                output[i*4+2] = (state[i] >>> 16) & 0xFF;
+                output[i*4+3] = (state[i] >>> 24) & 0xFF;
             }
             
             return output;
         }
         
-        function chacha20(key, counter, nonce, message) {
-            const messageBytes = new TextEncoder().encode(message);
-            const output = new Uint8Array(messageBytes.length);
+        function chacha20Encrypt(key, counter, nonce, plaintext) {
+            const plaintextBytes = new TextEncoder().encode(plaintext);
+            const ciphertext = new Uint8Array(plaintextBytes.length);
             
-            for (let i = 0; i < messageBytes.length; i += 64) {
-                const keyStream = chacha20Block(key, counter + Math.floor(i / 64), nonce);
-                const blockLength = Math.min(64, messageBytes.length - i);
+            for (let i = 0; i < plaintextBytes.length; i += BLOCK_SIZE) {
+                const keyStream = chacha20Block(key, counter + Math.floor(i / BLOCK_SIZE), nonce);
+                const blockLength = Math.min(BLOCK_SIZE, plaintextBytes.length - i);
                 
                 for (let j = 0; j < blockLength; j++) {
-                    output[i + j] = messageBytes[i + j] ^ keyStream[j];
+                    ciphertext[i + j] = plaintextBytes[i + j] ^ keyStream[j];
                 }
             }
             
-            return output;
+            return ciphertext;
         }
         
         // Alphabet conversion functions
@@ -467,9 +493,10 @@
                 
                 // Convert indices to bytes for encryption
                 const messageBytes = new Uint8Array(messageIndices);
+                const messageString = Array.from(messageBytes).map(b => String.fromCharCode(b)).join('');
                 
                 // Encrypt
-                const cipherBytes = chacha20(key, counter, nonce, new TextDecoder().decode(messageBytes));
+                const cipherBytes = chacha20Encrypt(key, counter, nonce, messageString);
                 
                 // Convert encrypted bytes to alphabet indices
                 const cipherIndices = new Uint8Array(cipherBytes.length);
@@ -522,9 +549,10 @@
                 
                 // Convert indices to bytes for decryption
                 const cipherBytes = new Uint8Array(cipherIndices);
+                const cipherString = Array.from(cipherBytes).map(b => String.fromCharCode(b)).join('');
                 
                 // Decrypt (same operation as encryption)
-                const messageBytes = chacha20(key, counter, nonce, new TextDecoder().decode(cipherBytes));
+                const messageBytes = chacha20Encrypt(key, counter, nonce, cipherString);
                 
                 // Convert decrypted bytes to alphabet indices
                 const messageIndices = new Uint8Array(messageBytes.length);
