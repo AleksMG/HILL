@@ -99,25 +99,29 @@
             // Константы
             const constants = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
             
-            // Преобразуем ключ, счетчик и нонс в массив 32-битных слов
+            // Преобразуем ключ в массив 32-битных слов (дополняем до 32 байт)
+            const keyBytes = new TextEncoder().encode(key.padEnd(32, '\0').slice(0, 32));
             const keyWords = [];
             for (let i = 0; i < 8; i++) {
                 keyWords.push(
-                    (key.charCodeAt(i*4+3) << 24) |
-                    (key.charCodeAt(i*4+2) << 16) |
-                    (key.charCodeAt(i*4+1) << 8) |
-                    key.charCodeAt(i*4)
+                    (keyBytes[i*4] << 0) |
+                    (keyBytes[i*4+1] << 8) |
+                    (keyBytes[i*4+2] << 16) |
+                    (keyBytes[i*4+3] << 24)
                 );
             }
             
             const counterWords = [counter, 0];
+            
+            // Преобразуем nonce в массив 32-битных слов (дополняем до 12 байт)
+            const nonceBytes = new TextEncoder().encode(nonce.padEnd(12, '\0').slice(0, 12));
             const nonceWords = [];
             for (let i = 0; i < 3; i++) {
                 nonceWords.push(
-                    (nonce.charCodeAt(i*4+3) << 24) |
-                    (nonce.charCodeAt(i*4+2) << 16) |
-                    (nonce.charCodeAt(i*4+1) << 8) |
-                    nonce.charCodeAt(i*4)
+                    (nonceBytes[i*4] << 0) |
+                    (nonceBytes[i*4+1] << 8) |
+                    (nonceBytes[i*4+2] << 16) |
+                    (nonceBytes[i*4+3] << 24)
                 );
             }
             
@@ -180,7 +184,7 @@
         }
 
         // Функции для работы с алфавитом
-        function textToIndices(text, alphabet) {
+        function textToBytes(text, alphabet) {
             const indices = [];
             for (let i = 0; i < text.length; i++) {
                 const index = alphabet.indexOf(text[i]);
@@ -189,13 +193,19 @@
                 }
                 indices.push(index);
             }
-            return indices;
+            
+            // Преобразуем индексы в байты
+            const bytes = new Uint8Array(indices.length);
+            for (let i = 0; i < indices.length; i++) {
+                bytes[i] = indices[i];
+            }
+            return bytes;
         }
 
-        function indicesToText(indices, alphabet) {
+        function bytesToText(bytes, alphabet) {
             let text = '';
-            for (let i = 0; i < indices.length; i++) {
-                text += alphabet[indices[i] % alphabet.length];
+            for (let i = 0; i < bytes.length; i++) {
+                text += alphabet[bytes[i] % alphabet.length];
             }
             return text;
         }
@@ -213,19 +223,13 @@
                 const message = document.getElementById('message').value.toUpperCase();
                 
                 // Проверяем, что сообщение состоит только из символов алфавита
-                const messageIndices = textToIndices(message, alphabet);
-                
-                // Преобразуем индексы в байты
-                const messageBytes = new Uint8Array(messageIndices);
+                const messageBytes = textToBytes(message, alphabet);
                 
                 // Шифруем
                 const cipherBytes = chacha20(key, counter, nonce, messageBytes);
                 
-                // Преобразуем байты обратно в индексы алфавита
-                const cipherIndices = Array.from(cipherBytes).map(b => b % alphabet.length);
-                
-                // Преобразуем индексы в текст
-                const ciphertext = indicesToText(cipherIndices, alphabet);
+                // Преобразуем байты в текст алфавита
+                const ciphertext = bytesToText(cipherBytes, alphabet);
                 
                 document.getElementById('ciphertext').value = ciphertext;
                 document.getElementById('result').textContent = 'Сообщение успешно зашифровано!';
@@ -246,20 +250,14 @@
                 const counter = parseInt(document.getElementById('counter').value);
                 const ciphertext = document.getElementById('ciphertext').value.toUpperCase();
                 
-                // Проверяем, что шифротекст состоит только из символов алфавита
-                const cipherIndices = textToIndices(ciphertext, alphabet);
-                
-                // Преобразуем индексы в байты
-                const cipherBytes = new Uint8Array(cipherIndices);
+                // Преобразуем шифротекст в байты
+                const cipherBytes = textToBytes(ciphertext, alphabet);
                 
                 // Дешифруем (процесс такой же как шифрование)
                 const messageBytes = chacha20(key, counter, nonce, cipherBytes);
                 
-                // Преобразуем байты обратно в индексы алфавита
-                const messageIndices = Array.from(messageBytes).map(b => b % alphabet.length);
-                
-                // Преобразуем индексы в текст
-                const message = indicesToText(messageIndices, alphabet);
+                // Преобразуем байты в текст алфавита
+                const message = bytesToText(messageBytes, alphabet);
                 
                 document.getElementById('result').textContent = 'Расшифрованное сообщение: ' + message;
             } catch (error) {
