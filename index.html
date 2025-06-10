@@ -1,38 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Усиленный шифр Хилла с S-Box</title>
+    <title>ChaCha20 с пользовательским алфавитом</title>
     <style>
         body {
-            font-family: 'Courier New', monospace;
+            font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        .section {
-            margin-bottom: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
         }
         textarea, input, button {
             width: 100%;
+            margin-bottom: 10px;
             padding: 8px;
-            margin: 5px 0;
-            box-sizing: border-box;
         }
         button {
             background-color: #4CAF50;
@@ -44,341 +26,246 @@
         button:hover {
             background-color: #45a049;
         }
-        .matrix-input {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 5px;
-            margin: 10px 0;
-        }
-        .matrix-input input {
-            text-align: center;
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
         .result {
-            background-color: #f9f9f9;
             padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
-            word-break: break-all;
+            border: 1px solid #ddd;
+            min-height: 50px;
         }
     </style>
 </head>
 <body>
+    <h1>ChaCha20 с пользовательским алфавитом</h1>
+    
     <div class="container">
-        <h1>Усиленный шифр Хилла с S-Box</h1>
-        
-        <div class="section">
-            <h2>Ключевая матрица</h2>
-            <div class="matrix-input" id="matrix-container">
-                <input type="number" id="m00" value="6">
-                <input type="number" id="m01" value="24">
-                <input type="number" id="m02" value="1">
-                <input type="number" id="m10" value="13">
-                <input type="number" id="m11" value="16">
-                <input type="number" id="m12" value="10">
-                <input type="number" id="m20" value="20">
-                <input type="number" id="m21" value="17">
-                <input type="number" id="m22" value="15">
-            </div>
-            <button id="check-matrix">Проверить обратимость матрицы</button>
-            <div id="matrix-status" class="result"></div>
+        <div>
+            <label for="alphabet">Алфавит (символы без пробелов):</label>
+            <input type="text" id="alphabet" value="ABCDEFGHIJKLMNOPQRSTUVWXYZ" placeholder="Введите алфавит (например, ABCDEFGHIJKLMNOPQRSTUVWXYZ)">
         </div>
         
-        <div class="section">
-            <h2>S-Box (подстановочная таблица)</h2>
-            <p>Введите 26 значений (0-25) в произвольном порядке для замены символов:</p>
-            <input type="text" id="sbox-input" value="4,10,9,2,13,8,20,21,19,23,18,24,12,17,5,16,7,22,6,0,3,25,1,15,11,14">
-            <div id="sbox-status" class="result"></div>
+        <div>
+            <label for="key">Ключ (любой текст):</label>
+            <input type="text" id="key" value="секретныйключ" placeholder="Введите ключ">
         </div>
         
-        <div class="section">
-            <h2>Шифрование/Дешифрование</h2>
-            <textarea id="input-text" rows="4" placeholder="Введите текст для шифрования (только буквы A-Z)"></textarea>
-            <button id="encrypt-btn">Зашифровать</button>
-            <button id="decrypt-btn">Расшифровать</button>
-            <div class="result" id="output-text"></div>
+        <div>
+            <label for="nonce">Nonce (уникальное значение):</label>
+            <input type="text" id="nonce" value="уникальныйнонс" placeholder="Введите nonce">
+        </div>
+        
+        <div>
+            <label for="counter">Счетчик (число):</label>
+            <input type="number" id="counter" value="1" min="0">
+        </div>
+        
+        <div>
+            <label for="message">Сообщение для шифрования (только символы из алфавита):</label>
+            <textarea id="message" rows="4" placeholder="Введите сообщение для шифрования"></textarea>
+        </div>
+        
+        <button onclick="encrypt()">Зашифровать</button>
+        
+        <div>
+            <label for="ciphertext">Шифротекст:</label>
+            <textarea id="ciphertext" rows="4" placeholder="Шифротекст появится здесь"></textarea>
+        </div>
+        
+        <button onclick="decrypt()">Расшифровать</button>
+        
+        <div>
+            <label>Результат:</label>
+            <div id="result" class="result"></div>
         </div>
     </div>
 
     <script>
-        // Инициализация элементов
-        const matrixInputs = document.querySelectorAll('.matrix-input input');
-        const checkMatrixBtn = document.getElementById('check-matrix');
-        const matrixStatus = document.getElementById('matrix-status');
-        const sboxInput = document.getElementById('sbox-input');
-        const sboxStatus = document.getElementById('sbox-status');
-        const inputText = document.getElementById('input-text');
-        const encryptBtn = document.getElementById('encrypt-btn');
-        const decryptBtn = document.getElementById('decrypt-btn');
-        const outputText = document.getElementById('output-text');
-        
-        // Проверка и создание S-Box
-        function validateSBox(input) {
-            const values = input.split(',').map(v => parseInt(v.trim()));
-            
-            if (values.length !== 26) {
-                sboxStatus.textContent = "Ошибка: нужно ровно 26 значений";
-                return null;
-            }
-            
-            const unique = new Set(values);
-            if (unique.size !== 26) {
-                sboxStatus.textContent = "Ошибка: значения должны быть уникальными";
-                return null;
-            }
-            
-            for (const val of values) {
-                if (isNaN(val) || val < 0 || val > 25) {
-                    sboxStatus.textContent = "Ошибка: значения должны быть числами от 0 до 25";
-                    return null;
-                }
-            }
-            
-            sboxStatus.textContent = "S-Box валидна";
-            return values;
+        // Функции для работы с ChaCha20
+        function quarterRound(state, a, b, c, d) {
+            state[a] += state[b]; state[d] = rotateLeft(state[d] ^ state[a], 16);
+            state[c] += state[d]; state[b] = rotateLeft(state[b] ^ state[c], 12);
+            state[a] += state[b]; state[d] = rotateLeft(state[d] ^ state[a], 8);
+            state[c] += state[d]; state[b] = rotateLeft(state[b] ^ state[c], 7);
         }
-        
-        // Создание обратного S-Box
-        function createInverseSBox(sbox) {
-            const inverse = new Array(26);
-            for (let i = 0; i < 26; i++) {
-                inverse[sbox[i]] = i;
-            }
-            return inverse;
+
+        function rotateLeft(value, amount) {
+            return (value << amount) | (value >>> (32 - amount));
         }
-        
-        // Получение матрицы из ввода
-        function getMatrix() {
-            const matrix = [];
+
+        function chacha20Block(key, counter, nonce) {
+            // Константы
+            const constants = [0x61707865, 0x3320646e, 0x79622d32, 0x6b206574];
+            
+            // Преобразуем ключ, счетчик и нонс в массив 32-битных слов
+            const keyWords = [];
+            for (let i = 0; i < 8; i++) {
+                keyWords.push(
+                    (key.charCodeAt(i*4+3) << 24) |
+                    (key.charCodeAt(i*4+2) << 16) |
+                    (key.charCodeAt(i*4+1) << 8) |
+                    key.charCodeAt(i*4)
+                );
+            }
+            
+            const counterWords = [counter, 0];
+            const nonceWords = [];
             for (let i = 0; i < 3; i++) {
-                const row = [];
-                for (let j = 0; j < 3; j++) {
-                    const val = parseInt(document.getElementById(`m${i}${j}`).value);
-                    row.push(val);
-                }
-                matrix.push(row);
+                nonceWords.push(
+                    (nonce.charCodeAt(i*4+3) << 24) |
+                    (nonce.charCodeAt(i*4+2) << 16) |
+                    (nonce.charCodeAt(i*4+1) << 8) |
+                    nonce.charCodeAt(i*4)
+                );
             }
-            return matrix;
-        }
-        
-        // Проверка обратимости матрицы
-        function isMatrixInvertible(matrix) {
-            // Вычисляем определитель
-            const a = matrix[0][0], b = matrix[0][1], c = matrix[0][2];
-            const d = matrix[1][0], e = matrix[1][1], f = matrix[1][2];
-            const g = matrix[2][0], h = matrix[2][1], i = matrix[2][2];
             
-            const det = a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g);
-            
-            // Матрица обратима по модулю 26, если det и 26 взаимно просты
-            return gcd(det, 26) === 1;
-        }
-        
-        // НОД (алгоритм Евклида)
-        function gcd(a, b) {
-            a = Math.abs(a);
-            b = Math.abs(b);
-            while (b) {
-                const t = b;
-                b = a % b;
-                a = t;
-            }
-            return a;
-        }
-        
-        // Обратная матрица по модулю 26
-        function inverseMatrix(matrix) {
-            const a = matrix[0][0], b = matrix[0][1], c = matrix[0][2];
-            const d = matrix[1][0], e = matrix[1][1], f = matrix[1][2];
-            const g = matrix[2][0], h = matrix[2][1], k = matrix[2][2];
-            
-            // Вычисляем определитель
-            const det = a*(e*k - f*h) - b*(d*k - f*g) + c*(d*h - e*g);
-            const detInv = modInverse(det, 26);
-            
-            // Матрица миноров
-            const minor00 = (e*k - f*h) * detInv % 26;
-            const minor01 = (d*k - f*g) * detInv % 26;
-            const minor02 = (d*h - e*g) * detInv % 26;
-            const minor10 = (b*k - c*h) * detInv % 26;
-            const minor11 = (a*k - c*g) * detInv % 26;
-            const minor12 = (a*h - b*g) * detInv % 26;
-            const minor20 = (b*f - c*e) * detInv % 26;
-            const minor21 = (a*f - c*d) * detInv % 26;
-            const minor22 = (a*e - b*d) * detInv % 26;
-            
-            // Обратная матрица (транспонированная матрица алгебраических дополнений)
-            return [
-                [positiveMod(minor00, 26), positiveMod(-minor10, 26), positiveMod(minor20, 26)],
-                [positiveMod(-minor01, 26), positiveMod(minor11, 26), positiveMod(-minor21, 26)],
-                [positiveMod(minor02, 26), positiveMod(-minor12, 26), positiveMod(minor22, 26)]
+            // Инициализация состояния
+            let state = [
+                constants[0], constants[1], constants[2], constants[3],
+                keyWords[0], keyWords[1], keyWords[2], keyWords[3],
+                keyWords[4], keyWords[5], keyWords[6], keyWords[7],
+                counterWords[0], counterWords[1], nonceWords[0], nonceWords[1], nonceWords[2]
             ];
+            
+            // Сохраняем исходное состояние
+            const initialState = state.slice();
+            
+            // 10 двойных раундов (20 раундов всего)
+            for (let i = 0; i < 10; i++) {
+                // Колонные раунды
+                quarterRound(state, 0, 4, 8, 12);
+                quarterRound(state, 1, 5, 9, 13);
+                quarterRound(state, 2, 6, 10, 14);
+                quarterRound(state, 3, 7, 11, 15);
+                
+                // Диагональные раунды
+                quarterRound(state, 0, 5, 10, 15);
+                quarterRound(state, 1, 6, 11, 12);
+                quarterRound(state, 2, 7, 8, 13);
+                quarterRound(state, 3, 4, 9, 14);
+            }
+            
+            // Складываем с исходным состоянием
+            for (let i = 0; i < 16; i++) {
+                state[i] += initialState[i];
+            }
+            
+            // Преобразуем в байтовый массив
+            let output = new Uint8Array(64);
+            for (let i = 0; i < 16; i++) {
+                output[i*4] = state[i] & 0xff;
+                output[i*4+1] = (state[i] >>> 8) & 0xff;
+                output[i*4+2] = (state[i] >>> 16) & 0xff;
+                output[i*4+3] = (state[i] >>> 24) & 0xff;
+            }
+            
+            return output;
         }
-        
-        // Обратный элемент в кольце вычетов
-        function modInverse(a, m) {
-            a = positiveMod(a, m);
-            for (let x = 1; x < m; x++) {
-                if ((a * x) % m === 1) {
-                    return x;
+
+        function chacha20(key, counter, nonce, data) {
+            let output = new Uint8Array(data.length);
+            
+            for (let i = 0; i < data.length; i += 64) {
+                const keyStream = chacha20Block(key, counter + Math.floor(i / 64), nonce);
+                const blockLength = Math.min(64, data.length - i);
+                
+                for (let j = 0; j < blockLength; j++) {
+                    output[i + j] = data[i + j] ^ keyStream[j];
                 }
             }
-            return 1;
+            
+            return output;
         }
-        
-        // Положительный модуль
-        function positiveMod(n, m) {
-            return ((n % m) + m) % m;
-        }
-        
-        // Преобразование текста в числа
-        function textToNumbers(text) {
-            return text.toUpperCase().replace(/[^A-Z]/g, '').split('').map(c => c.charCodeAt(0) - 65);
-        }
-        
-        // Преобразование чисел в текст
-        function numbersToText(numbers) {
-            return numbers.map(n => String.fromCharCode(n + 65)).join('');
-        }
-        
-        // Применение S-Box
-        function applySBox(numbers, sbox) {
-            return numbers.map(n => sbox[n]);
-        }
-        
-        // Обратное применение S-Box
-        function applyInverseSBox(numbers, inverseSbox) {
-            return numbers.map(n => inverseSbox[n]);
-        }
-        
-        // Шифрование блока
-        function encryptBlock(block, matrix) {
-            const result = [0, 0, 0];
-            for (let i = 0; i < 3; i++) {
-                for (let j = 0; j < 3; j++) {
-                    result[i] += matrix[i][j] * block[j];
+
+        // Функции для работы с алфавитом
+        function textToIndices(text, alphabet) {
+            const indices = [];
+            for (let i = 0; i < text.length; i++) {
+                const index = alphabet.indexOf(text[i]);
+                if (index === -1) {
+                    throw new Error(`Символ '${text[i]}' не найден в алфавите`);
                 }
-                result[i] = positiveMod(result[i], 26);
+                indices.push(index);
             }
-            return result;
+            return indices;
         }
-        
-        // Дешифрование блока
-        function decryptBlock(block, inverseMatrix) {
-            return encryptBlock(block, inverseMatrix);
+
+        function indicesToText(indices, alphabet) {
+            let text = '';
+            for (let i = 0; i < indices.length; i++) {
+                text += alphabet[indices[i] % alphabet.length];
+            }
+            return text;
         }
-        
-        // Основная функция шифрования
+
         function encrypt() {
-            const text = inputText.value;
-            if (!text) {
-                outputText.textContent = "Введите текст для шифрования";
-                return;
-            }
-            
-            const matrix = getMatrix();
-            if (!isMatrixInvertible(matrix)) {
-                outputText.textContent = "Ошибка: матрица необратима по модулю 26";
-                return;
-            }
-            
-            const sbox = validateSBox(sboxInput.value);
-            if (!sbox) return;
-            
-            const numbers = textToNumbers(text);
-            if (numbers.length === 0) {
-                outputText.textContent = "Текст должен содержать буквы A-Z";
-                return;
-            }
-            
-            // Дополнение до кратного 3
-            const paddingLength = (3 - (numbers.length % 3)) % 3;
-            const paddedNumbers = [...numbers, ...Array(paddingLength).fill(23)]; // 23 = 'X'
-            
-            // Применение S-Box перед шифрованием
-            const substituted = applySBox(paddedNumbers, sbox);
-            
-            // Разбиение на блоки и шифрование
-            const encryptedBlocks = [];
-            for (let i = 0; i < substituted.length; i += 3) {
-                const block = substituted.slice(i, i + 3);
-                const encryptedBlock = encryptBlock(block, matrix);
-                encryptedBlocks.push(...encryptedBlock);
-            }
-            
-            outputText.textContent = numbersToText(encryptedBlocks);
-        }
-        
-        // Основная функция дешифрования
-        function decrypt() {
-            const text = inputText.value;
-            if (!text) {
-                outputText.textContent = "Введите текст для дешифрования";
-                return;
-            }
-            
-            const matrix = getMatrix();
-            if (!isMatrixInvertible(matrix)) {
-                outputText.textContent = "Ошибка: матрица необратима по модулю 26";
-                return;
-            }
-            
-            const inverseMat = inverseMatrix(matrix);
-            const sbox = validateSBox(sboxInput.value);
-            if (!sbox) return;
-            
-            const inverseSbox = createInverseSBox(sbox);
-            const numbers = textToNumbers(text);
-            if (numbers.length === 0 || numbers.length % 3 !== 0) {
-                outputText.textContent = "Некорректная длина зашифрованного текста";
-                return;
-            }
-            
-            // Разбиение на блоки и дешифрование
-            const decryptedBlocks = [];
-            for (let i = 0; i < numbers.length; i += 3) {
-                const block = numbers.slice(i, i + 3);
-                const decryptedBlock = decryptBlock(block, inverseMat);
-                decryptedBlocks.push(...decryptedBlock);
-            }
-            
-            // Обратное применение S-Box
-            const desubstituted = applyInverseSBox(decryptedBlocks, inverseSbox);
-            
-            // Удаление дополнения (если было)
-            let padding = 0;
-            if (desubstituted.length > 0) {
-                const lastChar = desubstituted[desubstituted.length - 1];
-                if (lastChar === 23) { // 'X'
-                    padding = 1;
-                    // Проверяем, не было ли нескольких 'X' в конце
-                    for (let i = desubstituted.length - 2; i >= 0 && desubstituted[i] === 23; i--) {
-                        padding++;
-                    }
+            try {
+                const alphabet = document.getElementById('alphabet').value;
+                if (!alphabet) {
+                    throw new Error('Алфавит не может быть пустым');
                 }
+                
+                const key = document.getElementById('key').value;
+                const nonce = document.getElementById('nonce').value;
+                const counter = parseInt(document.getElementById('counter').value);
+                const message = document.getElementById('message').value.toUpperCase();
+                
+                // Проверяем, что сообщение состоит только из символов алфавита
+                const messageIndices = textToIndices(message, alphabet);
+                
+                // Преобразуем индексы в байты
+                const messageBytes = new Uint8Array(messageIndices);
+                
+                // Шифруем
+                const cipherBytes = chacha20(key, counter, nonce, messageBytes);
+                
+                // Преобразуем байты обратно в индексы алфавита
+                const cipherIndices = Array.from(cipherBytes).map(b => b % alphabet.length);
+                
+                // Преобразуем индексы в текст
+                const ciphertext = indicesToText(cipherIndices, alphabet);
+                
+                document.getElementById('ciphertext').value = ciphertext;
+                document.getElementById('result').textContent = 'Сообщение успешно зашифровано!';
+            } catch (error) {
+                document.getElementById('result').textContent = 'Ошибка: ' + error.message;
             }
-            const finalNumbers = desubstituted.slice(0, desubstituted.length - padding);
-            
-            outputText.textContent = numbersToText(finalNumbers);
         }
-        
-        // Обработчики событий
-        checkMatrixBtn.addEventListener('click', () => {
-            const matrix = getMatrix();
-            if (isMatrixInvertible(matrix)) {
-                matrixStatus.textContent = "Матрица обратима по модулю 26";
-                matrixStatus.style.color = "green";
-            } else {
-                matrixStatus.textContent = "Матрица необратима по модулю 26";
-                matrixStatus.style.color = "red";
+
+        function decrypt() {
+            try {
+                const alphabet = document.getElementById('alphabet').value;
+                if (!alphabet) {
+                    throw new Error('Алфавит не может быть пустым');
+                }
+                
+                const key = document.getElementById('key').value;
+                const nonce = document.getElementById('nonce').value;
+                const counter = parseInt(document.getElementById('counter').value);
+                const ciphertext = document.getElementById('ciphertext').value.toUpperCase();
+                
+                // Проверяем, что шифротекст состоит только из символов алфавита
+                const cipherIndices = textToIndices(ciphertext, alphabet);
+                
+                // Преобразуем индексы в байты
+                const cipherBytes = new Uint8Array(cipherIndices);
+                
+                // Дешифруем (процесс такой же как шифрование)
+                const messageBytes = chacha20(key, counter, nonce, cipherBytes);
+                
+                // Преобразуем байты обратно в индексы алфавита
+                const messageIndices = Array.from(messageBytes).map(b => b % alphabet.length);
+                
+                // Преобразуем индексы в текст
+                const message = indicesToText(messageIndices, alphabet);
+                
+                document.getElementById('result').textContent = 'Расшифрованное сообщение: ' + message;
+            } catch (error) {
+                document.getElementById('result').textContent = 'Ошибка: ' + error.message;
             }
-        });
-        
-        encryptBtn.addEventListener('click', encrypt);
-        decryptBtn.addEventListener('click', decrypt);
-        
-        // Инициализация S-Box
-        sboxInput.addEventListener('input', () => validateSBox(sboxInput.value));
-        validateSBox(sboxInput.value);
+        }
     </script>
 </body>
 </html>
