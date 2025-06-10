@@ -1,114 +1,70 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Letter ChaCha20</title>
+    <title>Letter-Preserving ChaCha20</title>
     <style>
-        body { font-family: Arial; max-width: 500px; margin: 0 auto; padding: 20px; }
-        .box { margin-bottom: 15px; }
-        textarea, input { width: 100%; padding: 8px; }
-        button { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
+        body { font-family: Arial; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; }
+        textarea, input { width: 100%; margin-bottom: 10px; }
+        button { padding: 8px 15px; background: #4CAF50; color: white; border: none; }
+        .error { color: red; }
     </style>
 </head>
 <body>
-    <h2>Letter-Preserving Encryption</h2>
-    
-    <div class="box">
-        <label>Message (A-Z only):</label>
+    <div class="container">
+        <h3>Letter-Preserving Encryption</h3>
         <textarea id="message" rows="3">HELLO</textarea>
-    </div>
-    
-    <div class="box">
-        <label>Key (any word):</label>
         <input id="key" type="text" value="SECRET">
-    </div>
-    
-    <button id="encrypt">Encrypt</button>
-    <button id="decrypt">Decrypt</button>
-    
-    <div class="box">
-        <label>Result:</label>
+        <button onclick="process()">Encrypt/Decrypt</button>
+        <div id="error" class="error"></div>
         <textarea id="result" rows="3" readonly></textarea>
     </div>
 
     <script>
-        // Преобразуем ключ в 256-битный ключ
-        async function getKey(keyStr) {
-            const encoder = new TextEncoder();
-            const keyMaterial = await crypto.subtle.importKey(
-                'raw',
-                encoder.encode(keyStr),
-                'PBKDF2',
-                false,
-                ['deriveKey']
-            );
-            
-            return await crypto.subtle.deriveKey(
-                {
-                    name: 'PBKDF2',
-                    salt: new Uint8Array(16),
-                    iterations: 100000,
-                    hash: 'SHA-256'
-                },
-                keyMaterial,
-                { name: 'ChaCha20', length: 256 },
-                false,
-                ['encrypt', 'decrypt']
-            );
-        }
-
-        // Шифрование с сохранением букв
-        async function encrypt() {
+        async function process() {
             const message = document.getElementById('message').value.toUpperCase();
             const keyStr = document.getElementById('key').value;
+            const errorEl = document.getElementById('error');
             
             if (!/^[A-Z]+$/.test(message)) {
-                alert('Only A-Z letters allowed!');
+                errorEl.textContent = 'Only A-Z letters allowed!';
                 return;
             }
             
             try {
-                const key = await getKey(keyStr);
+                // 1. Преобразуем ключ в байты
+                const encoder = new TextEncoder();
+                const keyMaterial = await crypto.subtle.importKey(
+                    'raw',
+                    encoder.encode(keyStr),
+                    { name: 'PBKDF2' },
+                    false,
+                    ['deriveBits']
+                );
+                
+                // 2. Генерируем ключ для ChaCha20
+                const salt = crypto.getRandomValues(new Uint8Array(16));
+                const keyBits = await crypto.subtle.deriveBits(
+                    {
+                        name: 'PBKDF2',
+                        salt: salt,
+                        iterations: 100000,
+                        hash: 'SHA-256'
+                    },
+                    keyMaterial,
+                    256
+                );
+                
+                const key = await crypto.subtle.importKey(
+                    'raw',
+                    keyBits,
+                    { name: 'ChaCha20' },
+                    false,
+                    ['encrypt', 'decrypt']
+                );
+                
+                // 3. Шифруем каждый символ
                 const iv = crypto.getRandomValues(new Uint8Array(12));
-                let result = '';
-                
-                for (let i = 0; i < message.length; i++) {
-                    // Генерируем keystream для каждого символа
-                    const counter = new Uint8Array(16);
-                    counter.set(iv);
-                    counter[15] = i; // Добавляем позицию символа
-                    
-                    const keystream = await crypto.subtle.encrypt(
-                        { name: 'ChaCha20', iv: counter },
-                        key,
-                        new Uint8Array(1) // Шифруем 1 байт
-                    );
-                    
-                    const byte = new Uint8Array(keystream)[0];
-                    const originalCharCode = message.charCodeAt(i) - 65; // A=0, B=1...
-                    const encryptedCharCode = (originalCharCode + byte) % 26;
-                    
-                    result += String.fromCharCode(65 + encryptedCharCode);
-                }
-                
-                document.getElementById('result').value = result;
-            } catch (e) {
-                alert('Error: ' + e.message);
-            }
-        }
-
-        // Дешифрование (аналогично шифрованию)
-        async function decrypt() {
-            const message = document.getElementById('message').value.toUpperCase();
-            const keyStr = document.getElementById('key').value;
-            
-            if (!/^[A-Z]+$/.test(message)) {
-                alert('Only A-Z letters allowed!');
-                return;
-            }
-            
-            try {
-                const key = await getKey(keyStr);
-                const iv = new Uint8Array(12); // В реальном коде нужно хранить IV
                 let result = '';
                 
                 for (let i = 0; i < message.length; i++) {
@@ -117,26 +73,31 @@
                     counter[15] = i;
                     
                     const keystream = await crypto.subtle.encrypt(
-                        { name: 'ChaCha20', iv: counter },
+                        {
+                            name: 'ChaCha20',
+                            iv: counter,
+                            counter: 0,
+                            length: 1
+                        },
                         key,
                         new Uint8Array(1)
                     );
                     
                     const byte = new Uint8Array(keystream)[0];
-                    const encryptedCharCode = message.charCodeAt(i) - 65;
-                    const originalCharCode = (encryptedCharCode - byte + 26) % 26;
+                    const charCode = message.charCodeAt(i) - 65;
+                    const encrypted = (charCode + byte) % 26;
                     
-                    result += String.fromCharCode(65 + originalCharCode);
+                    result += String.fromCharCode(65 + encrypted);
                 }
                 
                 document.getElementById('result').value = result;
+                errorEl.textContent = '';
+                
             } catch (e) {
-                alert('Error: ' + e.message);
+                errorEl.textContent = `Error: ${e.message}`;
+                console.error(e);
             }
         }
-
-        document.getElementById('encrypt').addEventListener('click', encrypt);
-        document.getElementById('decrypt').addEventListener('click', decrypt);
     </script>
 </body>
 </html>
