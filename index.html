@@ -74,6 +74,7 @@
             cursor: pointer;
             font-size: 16px;
             transition: background-color 0.3s;
+            margin: 5px;
         }
         
         button:hover {
@@ -116,7 +117,6 @@
             padding: 10px 15px;
             border-radius: 4px;
             margin-bottom: 15px;
-            display: none;
         }
         
         .alert-error {
@@ -157,32 +157,17 @@
         .tab-content.active {
             display: block;
         }
-        
-        .info-icon {
-            display: inline-block;
-            width: 18px;
-            height: 18px;
-            background-color: var(--secondary-color);
-            color: white;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 18px;
-            font-size: 12px;
-            cursor: help;
-            margin-left: 5px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Advanced Hill Cipher</h1>
         
-        <div class="alert" id="alertBox"></div>
+        <div id="alertBox" class="alert" style="display: none;"></div>
         
         <div class="tabs">
             <button class="tab active" onclick="openTab(event, 'encryptTab')">Encrypt</button>
             <button class="tab" onclick="openTab(event, 'decryptTab')">Decrypt</button>
-            <button class="tab" onclick="openTab(event, 'theoryTab')">Theory</button>
         </div>
         
         <!-- Encryption Tab -->
@@ -272,54 +257,20 @@
                 <div class="result-area" id="decryptionProcess"></div>
             </div>
         </div>
-        
-        <!-- Theory Tab -->
-        <div id="theoryTab" class="tab-content">
-            <div class="section">
-                <h2>Hill Cipher Theory</h2>
-                <p>The Hill cipher is a polygraphic substitution cipher based on linear algebra. Each letter is represented by a number (A=0, B=1, ..., Z=25).</p>
-                
-                <h3>Encryption Process</h3>
-                <p>The encryption is performed by breaking the plaintext into vectors of length 3 (for a 3x3 matrix) and multiplying each vector by the key matrix modulo 26:</p>
-                <p><strong>C = (K × P) mod 26</strong></p>
-                <p>Where:</p>
-                <ul>
-                    <li>C is the ciphertext vector</li>
-                    <li>K is the key matrix</li>
-                    <li>P is the plaintext vector</li>
-                </ul>
-                
-                <h3>Decryption Process</h3>
-                <p>Decryption requires finding the inverse of the key matrix modulo 26:</p>
-                <p><strong>P = (K⁻¹ × C) mod 26</strong></p>
-                <p>The inverse matrix exists only if the determinant of K is coprime with 26 (gcd(det(K), 26) = 1).</p>
-                
-                <h3>Enhancements in This Implementation</h3>
-                <ul>
-                    <li><strong>Multiple Rounds:</strong> The encryption/decryption process is repeated multiple times with different key matrices derived from the original.</li>
-                    <li><strong>S-Box:</strong> A substitution box adds nonlinearity by substituting numbers based on a key-dependent permutation.</li>
-                    <li><strong>Key Expansion:</strong> The initial key word is expanded to create round-specific key matrices.</li>
-                    <li><strong>Numerical Output:</strong> Ciphertext is displayed as numbers for clarity and to avoid character encoding issues.</li>
-                </ul>
-            </div>
-        </div>
     </div>
 
     <script>
+        // ========== CRYPTO FUNCTIONS ==========
+        
         // S-box generation - key dependent substitution
         function generateSBox(key) {
-            // Create initial S-box (0-255)
+            // Create initial S-box (0-25)
             let sbox = Array.from({length: 26}, (_, i) => i);
             
             // Use key to shuffle the S-box
-            let keySum = 0;
-            for (let i = 0; i < key.length; i++) {
-                keySum += key.charCodeAt(i);
-            }
-            
-            let j = keySum % 26;
+            let j = 0;
             for (let i = 0; i < 26; i++) {
-                j = (j + sbox[i] + key.charCodeAt(i % key.length)) % 26;
+                j = (j + sbox[i] + (key.charCodeAt(i % key.length) || 0)) % 26;
                 // Swap elements
                 [sbox[i], sbox[j]] = [sbox[j], sbox[i]];
             }
@@ -336,14 +287,14 @@
             return inverse;
         }
         
-        // Modular matrix operations
+        // Modular matrix inverse
         function modMatInv(matrix, mod) {
             // Calculate determinant
             let det = matrix[0][0] * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]) -
                       matrix[0][1] * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]) +
                       matrix[0][2] * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]);
             
-            det = ((det % mod) + mod) % mod; // Ensure positive
+            det = modPositive(det, mod);
             
             // Check if matrix is invertible
             if (gcd(det, mod) !== 1) {
@@ -353,32 +304,31 @@
             // Calculate adjugate matrix
             let adj = [
                 [
-                    (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]),
-                    -(matrix[0][1] * matrix[2][2] - matrix[0][2] * matrix[2][1]),
-                    (matrix[0][1] * matrix[1][2] - matrix[0][2] * matrix[1][1])
+                    modPositive(matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1], mod),
+                    modPositive(-(matrix[0][1] * matrix[2][2] - matrix[0][2] * matrix[2][1]), mod),
+                    modPositive(matrix[0][1] * matrix[1][2] - matrix[0][2] * matrix[1][1], mod)
                 ],
                 [
-                    -(matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]),
-                    (matrix[0][0] * matrix[2][2] - matrix[0][2] * matrix[2][0]),
-                    -(matrix[0][0] * matrix[1][2] - matrix[0][2] * matrix[1][0])
+                    modPositive(-(matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]), mod),
+                    modPositive(matrix[0][0] * matrix[2][2] - matrix[0][2] * matrix[2][0], mod),
+                    modPositive(-(matrix[0][0] * matrix[1][2] - matrix[0][2] * matrix[1][0]), mod)
                 ],
                 [
-                    (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]),
-                    -(matrix[0][0] * matrix[2][1] - matrix[0][1] * matrix[2][0]),
-                    (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0])
+                    modPositive(matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0], mod),
+                    modPositive(-(matrix[0][0] * matrix[2][1] - matrix[0][1] * matrix[2][0]), mod),
+                    modPositive(matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0], mod)
                 ]
             ];
             
             // Calculate modular inverse of determinant
             let detInv = modInverse(det, mod);
+            if (detInv === null) return null;
             
             // Calculate inverse matrix
             let inv = [[], [], []];
             for (let i = 0; i < 3; i++) {
                 for (let j = 0; j < 3; j++) {
-                    // Apply mod and ensure positive
-                    let val = adj[i][j] * detInv;
-                    inv[i][j] = ((val % mod) + mod) % mod;
+                    inv[i][j] = modPositive(adj[i][j] * detInv, mod);
                 }
             }
             
@@ -387,17 +337,24 @@
         
         // Greatest common divisor
         function gcd(a, b) {
+            a = Math.abs(a);
+            b = Math.abs(b);
             if (b === 0) return a;
             return gcd(b, a % b);
         }
         
         // Modular inverse using extended Euclidean algorithm
         function modInverse(a, m) {
-            a = ((a % m) + m) % m;
+            a = modPositive(a, m);
             for (let x = 1; x < m; x++) {
-                if ((a * x) % m === 1) return x;
+                if (modPositive(a * x, m) === 1) return x;
             }
-            return 1;
+            return null;
+        }
+        
+        // Ensure positive modulo result
+        function modPositive(a, m) {
+            return ((a % m) + m) % m;
         }
         
         // Matrix multiplication mod 26
@@ -408,7 +365,7 @@
                     for (let k = 0; k < 3; k++) {
                         result[i][j] += a[i][k] * b[k][j];
                     }
-                    result[i][j] = ((result[i][j] % 26) + 26) % 26;
+                    result[i][j] = modPositive(result[i][j], 26);
                 }
             }
             return result;
@@ -420,15 +377,15 @@
             while (key.length < 9) {
                 key += key;
             }
-            key = key.substring(0, 9);
+            key = key.substring(0, 9).toUpperCase();
             
-            // Convert to uppercase and get char codes (A=0, B=1, ...)
-            key = key.toUpperCase();
+            // Convert to numbers (A=0, B=1, ...)
             let matrix = [[], [], []];
             for (let i = 0; i < 9; i++) {
                 let row = Math.floor(i / 3);
                 let col = i % 3;
-                matrix[row][col] = key.charCodeAt(i) - 65;
+                let charCode = key.charCodeAt(i) || 65; // Default to 'A' if empty
+                matrix[row][col] = modPositive(charCode - 65, 26);
             }
             
             return matrix;
@@ -445,7 +402,7 @@
                 // Add some key-dependent variation
                 for (let row = 0; row < 3; row++) {
                     for (let col = 0; col < 3; col++) {
-                        newKey[row][col] = (newKey[row][col] + i + row + col) % 26;
+                        newKey[row][col] = modPositive(newKey[row][col] + i + row + col, 26);
                     }
                 }
                 
@@ -455,9 +412,12 @@
             return roundKeys;
         }
         
+        // ========== UI FUNCTIONS ==========
+        
         // Encrypt plaintext
         function encrypt() {
             try {
+                // Get and validate input
                 let plaintext = document.getElementById('plaintext').value.toUpperCase().replace(/[^A-Z]/g, '');
                 if (!plaintext) {
                     showAlert('Please enter plaintext to encrypt', 'error');
@@ -470,16 +430,14 @@
                     return;
                 }
                 
-                let rounds = parseInt(document.getElementById('rounds').value);
-                if (isNaN(rounds) rounds = 3;
+                let rounds = parseInt(document.getElementById('rounds').value) || 3;
                 
                 // Get key matrix from UI
                 let keyMatrix = getMatrixFromUI('keyMatrix');
                 if (!keyMatrix) return;
                 
                 // Validate matrix is invertible
-                let invMatrix = modMatInv(keyMatrix, 26);
-                if (!invMatrix) {
+                if (!modMatInv(keyMatrix, 26)) {
                     showAlert('Key matrix is not invertible (determinant must be coprime with 26)', 'error');
                     return;
                 }
@@ -517,19 +475,16 @@
                     for (let i = 0; i < currentNumbers.length; i += 3) {
                         let vector = [
                             currentNumbers[i],
-                            currentNumbers[i+1],
-                            currentNumbers[i+2]
+                            currentNumbers[i+1] || 0,
+                            currentNumbers[i+2] || 0
                         ];
                         
                         // Matrix multiplication
                         let encrypted = [
-                            (roundKeys[round][0][0] * vector[0] + roundKeys[round][0][1] * vector[1] + roundKeys[round][0][2] * vector[2]) % 26,
-                            (roundKeys[round][1][0] * vector[0] + roundKeys[round][1][1] * vector[1] + roundKeys[round][1][2] * vector[2]) % 26,
-                            (roundKeys[round][2][0] * vector[0] + roundKeys[round][2][1] * vector[1] + roundKeys[round][2][2] * vector[2]) % 26
+                            modPositive(roundKeys[round][0][0] * vector[0] + roundKeys[round][0][1] * vector[1] + roundKeys[round][0][2] * vector[2], 26),
+                            modPositive(roundKeys[round][1][0] * vector[0] + roundKeys[round][1][1] * vector[1] + roundKeys[round][1][2] * vector[2], 26),
+                            modPositive(roundKeys[round][2][0] * vector[0] + roundKeys[round][2][1] * vector[1] + roundKeys[round][2][2] * vector[2], 26)
                         ];
-                        
-                        // Ensure positive
-                        encrypted = encrypted.map(x => (x + 26) % 26);
                         
                         // Apply S-box substitution
                         let substituted = encrypted.map(x => sbox[x]);
@@ -584,16 +539,14 @@
                     return;
                 }
                 
-                let rounds = parseInt(document.getElementById('decryptRounds').value);
-                if (isNaN(rounds)) rounds = 3;
+                let rounds = parseInt(document.getElementById('decryptRounds').value) || 3;
                 
                 // Get key matrix from UI
                 let keyMatrix = getMatrixFromUI('decryptKeyMatrix');
                 if (!keyMatrix) return;
                 
                 // Validate matrix is invertible
-                let invMatrix = modMatInv(keyMatrix, 26);
-                if (!invMatrix) {
+                if (!modMatInv(keyMatrix, 26)) {
                     showAlert('Key matrix is not invertible (determinant must be coprime with 26)', 'error');
                     return;
                 }
@@ -612,7 +565,14 @@
                 let currentNumbers = [...cipherNumbers];
                 for (let round = rounds - 1; round >= 0; round--) {
                     processLog += `=== Round ${rounds - round} (original round ${round + 1}) ===\n`;
-                    processLog += `Key matrix inverse:\n${matrixToString(modMatInv(roundKeys[round], 26))}\n`;
+                    
+                    // Get inverse matrix for this round
+                    let invMatrix = modMatInv(roundKeys[round], 26);
+                    if (!invMatrix) {
+                        throw new Error(`Round key matrix ${round} is not invertible`);
+                    }
+                    
+                    processLog += `Key matrix inverse:\n${matrixToString(invMatrix)}\n`;
                     
                     // Apply inverse S-box first
                     let substituted = currentNumbers.map(x => inverseSbox[x]);
@@ -622,22 +582,16 @@
                     for (let i = 0; i < substituted.length; i += 3) {
                         let vector = [
                             substituted[i],
-                            substituted[i+1],
-                            substituted[i+2]
+                            substituted[i+1] || 0,
+                            substituted[i+2] || 0
                         ];
-                        
-                        // Get inverse matrix for this round
-                        let invMatrix = modMatInv(roundKeys[round], 26);
                         
                         // Matrix multiplication with inverse
                         let decrypted = [
-                            (invMatrix[0][0] * vector[0] + invMatrix[0][1] * vector[1] + invMatrix[0][2] * vector[2]) % 26,
-                            (invMatrix[1][0] * vector[0] + invMatrix[1][1] * vector[1] + invMatrix[1][2] * vector[2]) % 26,
-                            (invMatrix[2][0] * vector[0] + invMatrix[2][1] * vector[1] + invMatrix[2][2] * vector[2]) % 26
+                            modPositive(invMatrix[0][0] * vector[0] + invMatrix[0][1] * vector[1] + invMatrix[0][2] * vector[2], 26),
+                            modPositive(invMatrix[1][0] * vector[0] + invMatrix[1][1] * vector[1] + invMatrix[1][2] * vector[2], 26),
+                            modPositive(invMatrix[2][0] * vector[0] + invMatrix[2][1] * vector[1] + invMatrix[2][2] * vector[2], 26)
                         ];
-                        
-                        // Ensure positive
-                        decrypted = decrypted.map(x => (x + 26) % 26);
                         
                         roundResult.push(...decrypted);
                         
@@ -677,7 +631,7 @@
                     return null;
                 }
                 
-                matrix[row][col] = value;
+                matrix[row][col] = modPositive(value, 26);
             }
             
             return matrix;
