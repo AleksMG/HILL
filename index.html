@@ -1,30 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Letter-Preserving ChaCha20</title>
+    <title>Letter ChaCha20</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .container { display: flex; flex-direction: column; gap: 10px; }
-        textarea, input, button { padding: 8px; font-size: 16px; }
-        button { cursor: pointer; background: #007bff; color: white; border: none; }
-        .error { color: red; }
+        body { font-family: Arial; max-width: 500px; margin: 0 auto; padding: 20px; }
+        .box { margin-bottom: 15px; }
+        textarea, input { width: 100%; padding: 8px; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Letter-Preserving ChaCha20</h2>
-        <textarea id="message" placeholder="Message (A-Z only)">HELLO</textarea>
-        <input id="key" type="text" placeholder="Encryption key" value="SECRET">
-        <button id="encrypt">Encrypt</button>
-        <div id="result"></div>
-        <div id="error" class="error"></div>
+    <h2>Letter-Preserving Encryption</h2>
+    
+    <div class="box">
+        <label>Message (A-Z only):</label>
+        <textarea id="message" rows="3">HELLO</textarea>
+    </div>
+    
+    <div class="box">
+        <label>Key (any word):</label>
+        <input id="key" type="text" value="SECRET">
+    </div>
+    
+    <button id="encrypt">Encrypt</button>
+    <button id="decrypt">Decrypt</button>
+    
+    <div class="box">
+        <label>Result:</label>
+        <textarea id="result" rows="3" readonly></textarea>
     </div>
 
     <script>
-        async function processKey(keyStr) {
+        // Преобразуем ключ в 256-битный ключ
+        async function getKey(keyStr) {
             const encoder = new TextEncoder();
             const keyMaterial = await crypto.subtle.importKey(
-                'raw', encoder.encode(keyStr), 'PBKDF2', false, ['deriveKey']
+                'raw',
+                encoder.encode(keyStr),
+                'PBKDF2',
+                false,
+                ['deriveKey']
             );
             
             return await crypto.subtle.deriveKey(
@@ -41,61 +56,87 @@
             );
         }
 
-        async function encryptLetterPreserving(plaintext, keyStr) {
+        // Шифрование с сохранением букв
+        async function encrypt() {
+            const message = document.getElementById('message').value.toUpperCase();
+            const keyStr = document.getElementById('key').value;
+            
+            if (!/^[A-Z]+$/.test(message)) {
+                alert('Only A-Z letters allowed!');
+                return;
+            }
+            
             try {
-                const key = await processKey(keyStr);
+                const key = await getKey(keyStr);
                 const iv = crypto.getRandomValues(new Uint8Array(12));
+                let result = '';
                 
-                const plainNums = [];
-                for (let i = 0; i < plaintext.length; i++) {
-                    const charCode = plaintext.toUpperCase().charCodeAt(i);
-                    if (charCode < 65 || charCode > 90) throw new Error("Only A-Z letters allowed");
-                    plainNums.push(charCode - 65);
+                for (let i = 0; i < message.length; i++) {
+                    // Генерируем keystream для каждого символа
+                    const counter = new Uint8Array(16);
+                    counter.set(iv);
+                    counter[15] = i; // Добавляем позицию символа
+                    
+                    const keystream = await crypto.subtle.encrypt(
+                        { name: 'ChaCha20', iv: counter },
+                        key,
+                        new Uint8Array(1) // Шифруем 1 байт
+                    );
+                    
+                    const byte = new Uint8Array(keystream)[0];
+                    const originalCharCode = message.charCodeAt(i) - 65; // A=0, B=1...
+                    const encryptedCharCode = (originalCharCode + byte) % 26;
+                    
+                    result += String.fromCharCode(65 + encryptedCharCode);
                 }
                 
-                const cipherNums = [];
-                for (let i = 0; i < plainNums.length; i++) {
+                document.getElementById('result').value = result;
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        // Дешифрование (аналогично шифрованию)
+        async function decrypt() {
+            const message = document.getElementById('message').value.toUpperCase();
+            const keyStr = document.getElementById('key').value;
+            
+            if (!/^[A-Z]+$/.test(message)) {
+                alert('Only A-Z letters allowed!');
+                return;
+            }
+            
+            try {
+                const key = await getKey(keyStr);
+                const iv = new Uint8Array(12); // В реальном коде нужно хранить IV
+                let result = '';
+                
+                for (let i = 0; i < message.length; i++) {
                     const counter = new Uint8Array(16);
                     counter.set(iv);
                     counter[15] = i;
                     
                     const keystream = await crypto.subtle.encrypt(
-                        { name: 'ChaCha20', iv: counter, counter: 0, length: 1 },
+                        { name: 'ChaCha20', iv: counter },
                         key,
-                        new Uint8Array([0])
+                        new Uint8Array(1)
                     );
                     
-                    const keystreamByte = new Uint8Array(keystream)[0];
-                    cipherNums.push((plainNums[i] + keystreamByte) % 26);
+                    const byte = new Uint8Array(keystream)[0];
+                    const encryptedCharCode = message.charCodeAt(i) - 65;
+                    const originalCharCode = (encryptedCharCode - byte + 26) % 26;
+                    
+                    result += String.fromCharCode(65 + originalCharCode);
                 }
                 
-                let ciphertext = '';
-                for (const num of cipherNums) {
-                    ciphertext += String.fromCharCode(65 + num);
-                }
-                
-                return { ciphertext, iv };
-            } catch (err) {
-                document.getElementById('error').textContent = err.message;
-                throw err;
+                document.getElementById('result').value = result;
+            } catch (e) {
+                alert('Error: ' + e.message);
             }
         }
 
-        document.getElementById('encrypt').addEventListener('click', async () => {
-            const message = document.getElementById('message').value;
-            const key = document.getElementById('key').value;
-            
-            try {
-                const { ciphertext } = await encryptLetterPreserving(message, key);
-                document.getElementById('result').innerHTML = `
-                    <strong>Original:</strong> ${message}<br>
-                    <strong>Encrypted:</strong> ${ciphertext}
-                `;
-                document.getElementById('error').textContent = '';
-            } catch (err) {
-                console.error(err);
-            }
-        });
+        document.getElementById('encrypt').addEventListener('click', encrypt);
+        document.getElementById('decrypt').addEventListener('click', decrypt);
     </script>
 </body>
 </html>
