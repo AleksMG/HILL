@@ -696,13 +696,14 @@
                     for (let i = 0; i < plaintextBuffer.length; i++) {
                         const plainByte = plaintextBuffer[i];
                         
-                        // 1. АФФИННОЕ ПРЕОБРАЗОВАНИЕ (самое первое)
-                        let byteToEncrypt = plainByte;
+                        // 1. АФФИННОЕ ПРЕОБРАЗОВАНИЕ (самое первое!)
+                        let transformedByte = plainByte;
                         if (this.enableAffineTransform) {
-                            byteToEncrypt = this.affineTransformer.transform(plainByte);
+                            transformedByte = this.affineTransformer.transform(plainByte);
                         }
 
-                        // 2. Режимы диффузии (если нужно)
+                        // 2. РЕЖИМЫ ДИФФУЗИИ (работают как и раньше)
+                        let byteToEncrypt = transformedByte;
                         if (diffusionMode !== 'none') {
                             byteToEncrypt ^= previousBlock[i % 16];
                         }
@@ -795,7 +796,7 @@
                             decryptedByte ^= previousBlock[i % 16];
                         }
                         
-                        // 3. ОБРАТНОЕ АФФИННОЕ ПРЕОБРАЗОВАНИЕ (самое последнее)
+                        // 3. ОБРАТНОЕ АФФИННОЕ ПРЕОБРАЗОВАНИЕ (самое последнее!)
                         if (this.enableAffineTransform) {
                             decryptedByte = this.affineTransformer.inverseTransform(decryptedByte);
                         }
