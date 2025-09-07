@@ -353,7 +353,7 @@
     <div class="container">
         <header>
             <h1>Enhanced Homophonic Cipher System</h1>
-            <p class="subtitle">Military-grade encryption with multi-round MixColumns transformation</p>
+            <p class="subtitle">Military-grade encryption with affine transformation</p>
         </header>
 
         <div class="grid">
@@ -403,28 +403,9 @@
                     <h3 style="margin-bottom: 1rem; color: var(--primary);">Advanced Options</h3>
                     
                     <div class="option-row">
-                        <div class="option-label">Enable MixColumns:</div>
+                        <div class="option-label">Enable Affine Transform:</div>
                         <div class="option-control">
-                            <input type="checkbox" id="enableMixColumns" checked>
-                        </div>
-                    </div>
-                    
-                    <div class="option-row">
-                        <div class="option-label">MixColumns Rounds:</div>
-                        <div class="option-control">
-                            <select id="mixColumnsRounds">
-                                <option value="1">1 Round (Standard)</option>
-                                <option value="3" selected>3 Rounds (Enhanced)</option>
-                                <option value="6">6 Rounds (Strong)</option>
-                                <option value="12">12 Rounds (Maximum)</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="option-row">
-                        <div class="option-label">Enable Non-Linearity:</div>
-                        <div class="option-control">
-                            <input type="checkbox" id="enableNonLinearity" checked>
+                            <input type="checkbox" id="enableAffineTransform" checked>
                         </div>
                     </div>
                 </div>
@@ -521,17 +502,39 @@
     </div>
 
     <script>
-        class GaloisField {
-            static multiply(a, b) {
-                let p = 0;
-                for (let i = 0; i < 8; i++) {
-                    if (b & 1) p ^= a;
-                    const hiBitSet = a & 0x80;
-                    a = (a << 1) & 0xFF;
-                    if (hiBitSet) a ^= 0x1B;
-                    b >>= 1;
+        class AffineTransformer {
+            constructor(a, b) {
+                this.a = a | 1;    // Гарантируем нечетность
+                this.b = b;
+                this.state = 0;
+                this.a_inv = this.calculateInverse(this.a);
+            }
+
+            calculateInverse(a) {
+                // Находим обратный элемент: a * a_inv ≡ 1 mod 256
+                for (let i = 0; i < 256; i++) {
+                    if ((a * i) % 256 === 1) {
+                        return i;
+                    }
                 }
-                return p;
+                return 1; // fallback
+            }
+
+            init(initialState) {
+                this.state = initialState;
+            }
+
+            transform(inputByte) {
+                // S_n = (a * (S_{n-1} + inputByte) + b) mod 256
+                this.state = (this.a * (this.state + inputByte) + this.b) % 256;
+                return this.state;
+            }
+
+            inverseTransform(outputByte) {
+                // inputByte = (a_inv * (outputByte - b) - S_{n-1}) mod 256
+                const result = (this.a_inv * (outputByte - this.b + 256) - this.state) % 256;
+                this.state = outputByte;
+                return result;
             }
         }
 
@@ -588,21 +591,12 @@
                 this.sbox = null;
                 this.inverseSbox = null;
                 this.initializationVector = null;
-                this.hmacKey = null;
-                this.customCharset = null;
-                this.outputFormat = 'hex';
-                this.enableMixColumns = true;
-                this.mixColumnsRounds = 3;
-                this.enableNonLinearity = true;
+                this.affineTransformer = new AffineTransformer(0x3D, 0x57);
+                this.enableAffineTransform = true;
             }
 
-            setMixColumnsRounds(rounds) {
-                const validRounds = [1, 3, 6, 12];
-                this.mixColumnsRounds = validRounds.includes(rounds) ? rounds : 1;
-            }
-
-            setNonLinearity(enabled) {
-                this.enableNonLinearity = enabled;
+            setAffineTransform(enabled) {
+                this.enableAffineTransform = enabled;
             }
 
             async initializeWithKey(passphrase, iterations = 500000) {
@@ -659,108 +653,6 @@
                 this.customCharset = charset;
             }
 
-            setMixColumns(enabled) {
-                this.enableMixColumns = enabled;
-            }
-
-            applySingleMixColumnsRound(data) {
-                const result = new Uint8Array(data.length);
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    if (i + 3 >= data.length) break;
-                    
-                    const a0 = data[i];
-                    const a1 = data[i + 1];
-                    const a2 = data[i + 2];
-                    const a3 = data[i + 3];
-                    
-                    result[i] = GaloisField.multiply(0x02, a0) ^ GaloisField.multiply(0x03, a1) ^ a2 ^ a3;
-                    result[i + 1] = a0 ^ GaloisField.multiply(0x02, a1) ^ GaloisField.multiply(0x03, a2) ^ a3;
-                    result[i + 2] = a0 ^ a1 ^ GaloisField.multiply(0x02, a2) ^ GaloisField.multiply(0x03, a3);
-                    result[i + 3] = GaloisField.multiply(0x03, a0) ^ a1 ^ a2 ^ GaloisField.multiply(0x02, a3);
-                }
-                
-                for (let i = Math.floor(data.length / 4) * 4; i < data.length; i++) {
-                    result[i] = data[i];
-                }
-                
-                return result;
-            }
-
-            applySingleInvMixColumnsRound(data) {
-                const result = new Uint8Array(data.length);
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    if (i + 3 >= data.length) break;
-                    
-                    const a0 = data[i];
-                    const a1 = data[i + 1];
-                    const a2 = data[i + 2];
-                    const a3 = data[i + 3];
-                    
-                    result[i] = GaloisField.multiply(0x0e, a0) ^ GaloisField.multiply(0x0b, a1) ^ 
-                                GaloisField.multiply(0x0d, a2) ^ GaloisField.multiply(0x09, a3);
-                    result[i + 1] = GaloisField.multiply(0x09, a0) ^ GaloisField.multiply(0x0e, a1) ^ 
-                                    GaloisField.multiply(0x0b, a2) ^ GaloisField.multiply(0x0d, a3);
-                    result[i + 2] = GaloisField.multiply(0x0d, a0) ^ GaloisField.multiply(0x09, a1) ^ 
-                                    GaloisField.multiply(0x0e, a2) ^ GaloisField.multiply(0x0b, a3);
-                    result[i + 3] = GaloisField.multiply(0x0b, a0) ^ GaloisField.multiply(0x0d, a1) ^ 
-                                    GaloisField.multiply(0x09, a2) ^ GaloisField.multiply(0x0e, a3);
-                }
-                
-                for (let i = Math.floor(data.length / 4) * 4; i < data.length; i++) {
-                    result[i] = data[i];
-                }
-                
-                return result;
-            }
-
-            generateRoundConstants(round) {
-                const constants = new Uint8Array(4);
-                for (let i = 0; i < 4; i++) {
-                    constants[i] = (round * 0x17 + i * 0x37) & 0xFF;
-                }
-                return constants;
-            }
-
-            mixColumns(data) {
-                if (!this.enableMixColumns) return data;
-
-                let processedData = new Uint8Array(data);
-                
-                for (let round = 0; round < this.mixColumnsRounds; round++) {
-                    processedData = this.applySingleMixColumnsRound(processedData);
-                    
-                    if (this.enableNonLinearity) {
-                        const roundConstants = this.generateRoundConstants(round);
-                        for (let i = 0; i < processedData.length; i++) {
-                            processedData[i] ^= roundConstants[i % 4];
-                        }
-                    }
-                }
-                
-                return processedData;
-            }
-
-            invMixColumns(data) {
-                if (!this.enableMixColumns) return data;
-
-                let processedData = new Uint8Array(data);
-                
-                for (let round = this.mixColumnsRounds - 1; round >= 0; round--) {
-                    if (this.enableNonLinearity) {
-                        const roundConstants = this.generateRoundConstants(round);
-                        for (let i = 0; i < processedData.length; i++) {
-                            processedData[i] ^= roundConstants[i % 4];
-                        }
-                    }
-                    
-                    processedData = this.applySingleInvMixColumnsRound(processedData);
-                }
-                
-                return processedData;
-            }
-
             arrayToHex(array) {
                 return Array.from(array)
                     .map(b => b.toString(16).padStart(2, '0'))
@@ -797,14 +689,25 @@
                     this.initializationVector = crypto.getRandomValues(new Uint8Array(16));
                     let previousBlock = this.initializationVector;
                     
+                    // Инициализируем афинный преобразователь
+                    const initialByte = crypto.getRandomValues(new Uint8Array(1))[0];
+                    this.affineTransformer.init(initialByte);
+
                     for (let i = 0; i < plaintextBuffer.length; i++) {
                         const plainByte = plaintextBuffer[i];
                         
+                        // 1. АФФИННОЕ ПРЕОБРАЗОВАНИЕ (самое первое)
                         let byteToEncrypt = plainByte;
+                        if (this.enableAffineTransform) {
+                            byteToEncrypt = this.affineTransformer.transform(plainByte);
+                        }
+
+                        // 2. Режимы диффузии (если нужно)
                         if (diffusionMode !== 'none') {
                             byteToEncrypt ^= previousBlock[i % 16];
                         }
                         
+                        // 3. Омофоническая подстановка
                         const randomIndex = crypto.getRandomValues(new Uint8Array(1))[0];
                         const homophone = this.sbox[byteToEncrypt][randomIndex];
                         
@@ -816,20 +719,11 @@
                     }
                     
                     let outputBuffer;
-                    if (this.enableMixColumns) {
-                        const ciphertextBytes = new Uint8Array(ciphertext.buffer);
-                        const mixedCiphertext = this.mixColumns(ciphertextBytes);
-                        
-                        outputBuffer = new Uint8Array(16 + mixedCiphertext.length);
-                        outputBuffer.set(this.initializationVector, 0);
-                        outputBuffer.set(mixedCiphertext, 16);
-                    } else {
-                        outputBuffer = new Uint8Array(16 + ciphertext.length * 2);
-                        outputBuffer.set(this.initializationVector, 0);
-                        
-                        const ciphertextBytes = new Uint8Array(ciphertext.buffer);
-                        outputBuffer.set(ciphertextBytes, 16);
-                    }
+                    const ciphertextBytes = new Uint8Array(ciphertext.buffer);
+                    
+                    outputBuffer = new Uint8Array(16 + ciphertextBytes.length);
+                    outputBuffer.set(this.initializationVector, 0);
+                    outputBuffer.set(ciphertextBytes, 16);
 
                     switch (this.outputFormat) {
                         case 'hex':
@@ -875,17 +769,17 @@
                     }
                     
                     const iv = inputBuffer.slice(0, 16);
-                    let ciphertextBytes = inputBuffer.slice(16);
-                    
-                    if (this.enableMixColumns) {
-                        ciphertextBytes = this.invMixColumns(ciphertextBytes);
-                    }
+                    const ciphertextBytes = inputBuffer.slice(16);
                     
                     const ciphertext = new Uint16Array(ciphertextBytes.buffer);
                     
                     let plaintextBuffer = new Uint8Array(ciphertext.length);
                     let previousBlock = iv;
                     
+                    // Инициализируем афинный преобразователь
+                    const initialByte = iv[0];
+                    this.affineTransformer.init(initialByte);
+
                     for (let i = 0; i < ciphertext.length; i++) {
                         const homophone = ciphertext[i];
                         
@@ -893,10 +787,17 @@
                             throw new Error('Invalid homophone in ciphertext');
                         }
                         
+                        // 1. Обратная омофоническая подстановка
                         let decryptedByte = this.inverseSbox.get(homophone);
                         
+                        // 2. Обработка режимов диффузии
                         if (diffusionMode !== 'none') {
                             decryptedByte ^= previousBlock[i % 16];
+                        }
+                        
+                        // 3. ОБРАТНОЕ АФФИННОЕ ПРЕОБРАЗОВАНИЕ (самое последнее)
+                        if (this.enableAffineTransform) {
+                            decryptedByte = this.affineTransformer.inverseTransform(decryptedByte);
                         }
                         
                         plaintextBuffer[i] = decryptedByte;
@@ -1157,9 +1058,7 @@
                 const outputFormat = document.getElementById('outputFormat');
                 const customCharset = document.getElementById('customCharset');
                 const generateBtn = document.getElementById('generateCharset');
-                const enableMixColumns = document.getElementById('enableMixColumns');
-                const mixColumnsRounds = document.getElementById('mixColumnsRounds');
-                const enableNonLinearity = document.getElementById('enableNonLinearity');
+                const enableAffineTransform = document.getElementById('enableAffineTransform');
 
                 encryptBtn.addEventListener('click', () => this.handleEncrypt());
                 decryptBtn.addEventListener('click', () => this.handleDecrypt());
@@ -1175,16 +1074,8 @@
                     this.saveSettings();
                 });
                 generateBtn.addEventListener('click', () => this.handleGenerateCharset());
-                enableMixColumns.addEventListener('change', () => {
-                    this.cipher.setMixColumns(enableMixColumns.checked);
-                    this.saveSettings();
-                });
-                mixColumnsRounds.addEventListener('change', () => {
-                    this.cipher.setMixColumnsRounds(parseInt(mixColumnsRounds.value));
-                    this.saveSettings();
-                });
-                enableNonLinearity.addEventListener('change', () => {
-                    this.cipher.setNonLinearity(enableNonLinearity.checked);
+                enableAffineTransform.addEventListener('change', () => {
+                    this.cipher.setAffineTransform(enableAffineTransform.checked);
                     this.saveSettings();
                 });
             }
@@ -1277,9 +1168,7 @@
                     diffusionMode: document.getElementById('diffusionMode').value,
                     outputFormat: document.getElementById('outputFormat').value,
                     customCharset: document.getElementById('customCharset').value,
-                    enableMixColumns: document.getElementById('enableMixColumns').checked,
-                    mixColumnsRounds: document.getElementById('mixColumnsRounds').value,
-                    enableNonLinearity: document.getElementById('enableNonLinearity').checked
+                    enableAffineTransform: document.getElementById('enableAffineTransform').checked
                 };
                 localStorage.setItem('cipherSettings', JSON.stringify(settings));
             }
@@ -1292,13 +1181,9 @@
                     document.getElementById('diffusionMode').value = settings.diffusionMode;
                     document.getElementById('outputFormat').value = settings.outputFormat;
                     document.getElementById('customCharset').value = settings.customCharset;
-                    document.getElementById('enableMixColumns').checked = settings.enableMixColumns;
-                    document.getElementById('mixColumnsRounds').value = settings.mixColumnsRounds;
-                    document.getElementById('enableNonLinearity').checked = settings.enableNonLinearity;
+                    document.getElementById('enableAffineTransform').checked = settings.enableAffineTransform;
                     
-                    this.cipher.setMixColumns(settings.enableMixColumns);
-                    this.cipher.setMixColumnsRounds(parseInt(settings.mixColumnsRounds));
-                    this.cipher.setNonLinearity(settings.enableNonLinearity);
+                    this.cipher.setAffineTransform(settings.enableAffineTransform);
                     this.handleOutputFormatChange();
                     this.updateCharsetPreview();
                 }
@@ -1496,8 +1381,7 @@
                         '• 65536-element homophonic S-Box\n' +
                         '• Non-deterministic encryption (semantic security)\n' +
                         '• Multiple output formats support\n' +
-                        '• Multi-round MixColumns transformation\n' +
-                        '• Inter-round non-linearity enhancement\n' +
+                        '• Affine transformation for entropy enhancement\n' +
                         '• Multiple diffusion modes (CBC, CFB, OFB)';
                 }, 1000);
             }
@@ -1521,18 +1405,12 @@
             updateSecurityInfo(operation, length) {
                 const format = document.getElementById('outputFormat').value;
                 const diffusionMode = document.getElementById('diffusionMode').value;
-                const mixColumns = document.getElementById('enableMixColumns').checked;
-                const rounds = document.getElementById('mixColumnsRounds').value;
-                const nonLinearity = document.getElementById('enableNonLinearity').checked;
+                const affineTransform = document.getElementById('enableAffineTransform').checked;
                 
                 let info = `Operation: ${operation.toUpperCase()}\n`;
                 info += `Output format: ${format}\n`;
                 info += `Diffusion mode: ${diffusionMode}\n`;
-                info += `MixColumns: ${mixColumns ? 'Enabled' : 'Disabled'}\n`;
-                if (mixColumns) {
-                    info += `MixColumns rounds: ${rounds}\n`;
-                    info += `Non-linearity: ${nonLinearity ? 'Enabled' : 'Disabled'}\n`;
-                }
+                info += `Affine transform: ${affineTransform ? 'Enabled' : 'Disabled'}\n`;
                 info += `Data length: ${length} ${format === 'binary' ? 'bytes' : 'characters'}\n`;
                 info += `S-Box: Deterministic generation\n`;
                 info += `Key: PBKDF2-HMAC-SHA512 with password-based salt`;
